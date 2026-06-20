@@ -571,33 +571,41 @@
     const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
     const segmentInstructions = {
-      weather: `WEATHER: Give a realistic, detailed weather forecast for the ${location} area for today and the next 2 days. Include temperatures (high/low), conditions, any notable weather warnings. Then write a short, natural-sounding talk break (2-3 sentences) for the host to read on-air.`,
-      news: `LOCAL NEWS: Generate 3-4 local news stories that might realistically be happening in or near ${location}. Each story should have a headline and 2-3 bullet points of key facts. Then write a punchy one-liner intro the DJ could use.`,
-      events: `COMMUNITY EVENTS: List 4-5 realistic local community events happening this week in ${location}. Include event name, date/time, location, and a brief description. Include a mix of free and paid events.`,
-      birthday: `CELEBRITY BIRTHDAYS: List 4-5 celebrities with birthdays today (${today}). Include their name, age they're turning, and a quick interesting fact about them. Focus on celebrities relevant to a ${genre} radio audience.`,
-      trending: `TRENDING TOPICS: What are 4-5 topics currently trending on social media that would be interesting to a ${genre} radio audience? For each: the topic, why it's trending, and a suggested audience question or phone topic the DJ could throw to listeners.`,
-      music: `MUSIC NEWS: Give 3-4 music news stories relevant to a ${genre} station. Include new releases, tour announcements, artist news, chart notes. Write it like a music reporter's briefing.`,
-      sports: `SPORTS RECAP: Give highlights from last night's or recent sports news. Cover the major leagues (NFL, NBA, MLB, NHL depending on season) with scores and standout moments. Keep it punchy.`,
-      viral: `VIRAL & WEIRD NEWS: Find 3 fun, weird, or viral news stories from around the world that would make great on-air chat fodder. Each should have a headline, the key facts, and why it's funny or interesting.`,
-      trivia: `TRIVIA & FUN FACTS: Provide 2-3 trivia questions (with answers) and 2-3 surprising fun facts that would work well as on-air trivia bits for a ${genre} audience. Make them feel fresh, not overdone.`,
+      weather: `WEATHER: Use ONLY the real weather data provided in the REAL DATA block above. Do not invent or estimate weather. Convert the forecast into a radio-friendly outlook covering today, tonight, and tomorrow. Write a warm, conversational talk break (2-3 sentences) a DJ can read naturally — like a friend telling you what to expect outside, not a stiff forecast.`,
+      news: `LOCAL NEWS: Use ONLY the real local news headlines from the REAL DATA block above. Do not fabricate any stories. Pick the 3-4 most interesting/relevant stories for a ${genre} audience in ${location}. Rewrite each as a punchy radio headline with 2-3 bullet point details. If local headlines are thin, use the strongest national ones. Add a one-liner DJ intro to toss to the stories.`,
+      events: `COMMUNITY EVENTS: Suggest 4-5 plausible local community events for ${location} this week — festivals, farmers markets, concerts, sports, charity events. Mix free and paid. Note clearly that the host should verify all details before airing.`,
+      birthday: `CELEBRITY BIRTHDAYS: List 4-5 celebrities with birthdays TODAY (${today}). CRITICAL: Only include people who are CONFIRMED ALIVE. Do not include anyone who has died — Brian Wilson died June 11 2025, do not include him. If unsure whether someone is alive, leave them out. Include name, age turning today, and one punchy interesting fact. Focus on names a ${genre} audience would recognize.`,
+      trending: `TRENDING TOPICS: Using the ENTERTAINMENT & TRENDING HEADLINES from the REAL DATA block above, identify 4-5 topics that are buzzing right now. For each: name the topic, explain briefly why it's trending based on the real headlines, and suggest a listener phone question the DJ can throw to callers.`,
+      music: `MUSIC NEWS: Using the MUSIC NEWS HEADLINES from the REAL DATA block above, write up 3-4 music news items relevant to a ${genre} station. Rewrite the real headlines in a punchy, radio-friendly style. Add context where helpful. Write it like a music reporter's fast briefing.`,
+      sports: `SPORTS RECAP: Using the REAL SPORTS SCORES from the REAL DATA block above, write a punchy sports update. Cover whichever leagues have games listed. Pull out the most interesting scores, upsets, or storylines. Keep it fast and fun — this is radio, not SportsCenter.`,
+      viral: `VIRAL & WEIRD NEWS: Using the VIRAL/WEIRD NEWS HEADLINES from the REAL DATA block above, pick 3 fun, strange, or only-on-the-internet stories. For each: write a punchy headline, summarize the key facts in 1-2 sentences, and add a suggested DJ reaction or listener question. Keep it fun and safe for all audiences.`,
+      trivia: `TRIVIA & FUN FACTS: Provide 2-3 trivia questions with answers and 2-3 surprising fun facts connected to today (${today}) or relevant to a ${genre} audience. Keep them fresh and avoid overused classics. Format clearly with the answer on a separate line after each question.`,
     };
 
     const requestedInstructions = segs.map(s => segmentInstructions[s]).join('\n\n');
 
-    const systemPrompt = `You are an experienced radio show prep writer generating content for a ${genre} radio station in ${location}. Today is ${today}. The show is a ${format} show.
+    const systemPrompt = `You are an expert radio show prep writer for a ${genre} station in ${location}. Today is ${today}. The show is a ${format} show.
 
-Generate realistic, entertaining, and locally relevant show prep content. Write in a style that's appropriate for ${genre} radio — engaging, punchy, and easy to read on-air.
+CRITICAL RULES — READ BEFORE WRITING ANYTHING:
+1. WEATHER: Real forecast data is in the REAL DATA block. Use it exclusively. Never invent weather.
+2. NEWS: Real local headlines are in the REAL DATA block. Use them. Never fabricate news stories.
+3. MUSIC NEWS: Real music headlines are in the REAL DATA block. Use them.
+4. TRENDING: Real entertainment headlines are in the REAL DATA block. Base trending topics on these.
+5. VIRAL NEWS: Real weird/viral headlines are in the REAL DATA block. Use them.
+6. SPORTS: Real ESPN scores are in the REAL DATA block. Use actual scores and teams listed.
+7. CELEBRITY BIRTHDAYS: Only include people CONFIRMED ALIVE as of ${today}. Brian Wilson died June 11 2025 — do not include him. When in doubt, leave them out.
+8. Write everything like a seasoned morning drive pro — warm, punchy, conversational, never stiff.
 
 You MUST respond with ONLY valid JSON. No markdown, no explanation, no preamble. The JSON must have a key for each requested segment using these exact keys: ${segs.join(', ')}.
 
 Each segment value is an object with:
 - "items": array of strings (bullet points, facts, story headlines, etc.)
-- "talkBreak": a 2-3 sentence suggested on-air talk break the host can read or riff from
+- "talkBreak": a 2-3 sentence suggested on-air talk break the host can read naturally
 
 For news and events segments, each item in "items" should be formatted as: "HEADLINE || detail1 | detail2 | detail3"
 For all other segments, items are simple strings.
 
-Keep items concise, vivid, and radio-ready. The talkBreak should sound conversational and natural, not stiff.`;
+Keep items concise, vivid, and radio-ready. The talkBreak should sound like a real DJ — warm, natural, never stiff.`;
 
     const WORKER_URL = 'https://yellow-dust-4e2d.radiodoctorjd.workers.dev/';
 
@@ -610,6 +618,7 @@ Keep items concise, vivid, and radio-ready. The talkBreak should sound conversat
           body: JSON.stringify({
             model: 'claude-sonnet-4-6',
             max_tokens: 8000,
+            location: location,
             system: systemPrompt,
             messages: [{ role: 'user', content: requestedInstructions }]
           })
