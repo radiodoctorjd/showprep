@@ -573,7 +573,7 @@
     const segmentInstructions = {
       weather: `WEATHER: Use ONLY the real weather data provided in the REAL DATA block above. Do not invent or estimate weather. Convert the forecast into a radio-friendly outlook covering today, tonight, and tomorrow. Write a warm, conversational talk break (2-3 sentences) a DJ can read naturally — like a friend telling you what to expect outside, not a stiff forecast.`,
       news: `LOCAL NEWS: Use ONLY the real local news headlines from the REAL DATA block above. Do not fabricate any stories. Pick the 3-4 most interesting/relevant stories for a ${genre} audience in ${location}. Rewrite each as a punchy radio headline with 2-3 bullet point details. If local headlines are thin, use the strongest national ones. Add a one-liner DJ intro to toss to the stories.`,
-      events: `COMMUNITY EVENTS: Suggest 4-5 plausible local community events for ${location} this week — festivals, farmers markets, concerts, sports, charity events. Mix free and paid. Note clearly that the host should verify all details before airing.`,
+      events: `COMMUNITY EVENTS: Use your web search tool to find REAL community events happening this week in ${location}. Search for "${location} community events this week" and "${location} things to do this weekend". Return 4-5 actual upcoming events with real names, dates, times, and locations. Only include events you can confirm exist from real search results.`,
       birthday: `CELEBRITY BIRTHDAYS: List 4-5 celebrities with birthdays TODAY (${today}). CRITICAL: Only include people who are CONFIRMED ALIVE. Do not include anyone who has died — Brian Wilson died June 11 2025, do not include him. If unsure whether someone is alive, leave them out. Include name, age turning today, and one punchy interesting fact. Focus on names a ${genre} audience would recognize.`,
       trending: `TRENDING TOPICS: Using the ENTERTAINMENT & TRENDING HEADLINES from the REAL DATA block above, identify 4-5 topics that are buzzing right now. For each: name the topic, explain briefly why it's trending based on the real headlines, and suggest a listener phone question the DJ can throw to callers.`,
       music: `MUSIC NEWS: Using the MUSIC NEWS HEADLINES from the REAL DATA block above, write up 3-4 music news items relevant to a ${genre} station. Rewrite the real headlines in a punchy, radio-friendly style. Add context where helpful. Write it like a music reporter's fast briefing.`,
@@ -647,6 +647,7 @@ The talkBreak is what the DJ reads live. Make it sound human — like they just 
         throw new Error('Unexpected API response: ' + JSON.stringify(data).slice(0, 200));
       }
 
+      // Filter for text blocks only — ignore tool_use and tool_result blocks from web search
       const rawText = data.content.filter(b => b.type === 'text').map(b => b.text).join('');
       const clean = rawText.replace(/^```json\s*/,'').replace(/```\s*$/,'').trim();
 
