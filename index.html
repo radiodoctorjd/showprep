@@ -84,9 +84,9 @@
 
   /* ── Setup panel ── */
   #setup {
-    max-width: 560px;
-    margin: 5rem auto 0;
-    padding: 0 1.5rem;
+    max-width: 1100px;
+    margin: 2rem auto 0;
+    padding: 0 2rem;
   }
 
   .setup-eyebrow {
@@ -109,7 +109,7 @@
   .setup-subtitle {
     font-size: 0.95rem;
     color: var(--text-muted);
-    margin-bottom: 2.5rem;
+    margin-bottom: 1.5rem;
     line-height: 1.6;
   }
 
@@ -250,9 +250,9 @@
   /* ── Results ── */
   #results {
     display: none;
-    max-width: 900px;
+    max-width: 1100px;
     margin: 0 auto;
-    padding: 1.5rem 1.5rem 4rem;
+    padding: 1.5rem 2rem 4rem;
   }
 
   .results-header {
@@ -312,6 +312,7 @@
     border-radius: 8px;
     margin-bottom: 1rem;
     overflow: hidden;
+    break-inside: avoid;
   }
 
   .segment-header {
@@ -435,51 +436,55 @@
   <h1 class="setup-title">Your show,<br>prepped in seconds.</h1>
   <p class="setup-subtitle">Enter your market and show format. We'll generate everything you need to fill the air — weather, news, trending topics, celebrity birthdays, and more.</p>
 
-  <div class="field-group">
-    <label for="location">City / Market</label>
-    <input type="text" id="location" placeholder="e.g. Burlington, VT or Nashville, TN" />
-  </div>
-
-  <div class="field-group">
-    <label for="format">Show Format</label>
-    <select id="format">
-      <option value="morning drive (5am–10am), high energy, commuter-focused">&#9728; Morning Drive (5am – 10am)</option>
-      <option value="midday (10am–3pm), relaxed and conversational">&#9788; Midday (10am – 3pm)</option>
-      <option value="afternoon drive (3pm–7pm), high energy, commuter-focused">&#128663; Afternoon Drive (3pm – 7pm)</option>
-      <option value="evening/night show (7pm–midnight), chill and music-heavy">&#9790; Evening / Night Show</option>
-      <option value="weekend show, relaxed and fun">&#127774; Weekend Show</option>
-    </select>
-  </div>
-
-  <div class="field-group">
-    <label for="genre">Music Format</label>
-    <select id="genre">
-      <option value="Top 40/Pop">Top 40 / Pop</option>
-      <option value="Country">Country</option>
-      <option value="Hip-Hop/R&B">Hip-Hop / R&amp;B</option>
-      <option value="Rock/Alternative">Rock / Alternative</option>
-      <option value="Adult Contemporary">Adult Contemporary</option>
-      <option value="Classic Hits">Classic Hits / Oldies</option>
-      <option value="News/Talk">News / Talk</option>
-    </select>
-  </div>
-
-  <div class="field-group">
-    <label>Segments to Include</label>
-    <div class="segment-grid">
-      <button class="seg-toggle active" data-seg="weather"><span class="dot"></span>&#127784; Weather Forecast</button>
-      <button class="seg-toggle active" data-seg="news"><span class="dot"></span>&#128240; Local News</button>
-      <button class="seg-toggle active" data-seg="events"><span class="dot"></span>&#127881; Community Events</button>
-      <button class="seg-toggle active" data-seg="birthday"><span class="dot"></span>&#127874; Celebrity Birthdays</button>
-      <button class="seg-toggle active" data-seg="trending"><span class="dot"></span>&#128200; Trending Topics</button>
-      <button class="seg-toggle active" data-seg="music"><span class="dot"></span>&#127925; Music News</button>
-      <button class="seg-toggle" data-seg="sports"><span class="dot"></span>&#127944; Sports Recap</button>
-      <button class="seg-toggle" data-seg="viral"><span class="dot"></span>&#128247; Viral / Weird News</button>
-      <button class="seg-toggle" data-seg="trivia"><span class="dot"></span>&#129300; Trivia / Fun Fact</button>
+  <!-- Top row: 3 fields side by side -->
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1.25rem;margin-bottom:1.25rem;">
+    <div class="field-group" style="margin-bottom:0;">
+      <label for="location">City / Market</label>
+      <input type="text" id="location" placeholder="e.g. Burlington, VT" />
+    </div>
+    <div class="field-group" style="margin-bottom:0;">
+      <label for="format">Daypart</label>
+      <select id="format">
+        <option value="morning drive (5am–10am), high energy, commuter-focused">&#9728; Morning Drive (5am – 10am)</option>
+        <option value="midday (10am–3pm), relaxed and conversational">&#9788; Midday (10am – 3pm)</option>
+        <option value="afternoon drive (3pm–7pm), high energy, commuter-focused">&#128663; Afternoon Drive (3pm – 7pm)</option>
+        <option value="evening/night show (7pm–midnight), chill and music-heavy">&#9790; Evening / Night Show</option>
+        <option value="weekend show, relaxed and fun">&#127774; Weekend Show</option>
+      </select>
+    </div>
+    <div class="field-group" style="margin-bottom:0;">
+      <label for="genre">Music Format</label>
+      <select id="genre">
+        <option value="Top 40/Pop">Top 40 / Pop</option>
+        <option value="Country">Country</option>
+        <option value="Hip-Hop/R&B">Hip-Hop / R&amp;B</option>
+        <option value="Rock/Alternative">Rock / Alternative</option>
+        <option value="Adult Contemporary">Adult Contemporary</option>
+        <option value="Classic Hits">Classic Hits / Oldies</option>
+        <option value="News/Talk">News / Talk</option>
+      </select>
     </div>
   </div>
 
-  <button class="gen-btn" id="genBtn" onclick="generatePrep()">&#9654; Generate Show Prep</button>
+  <!-- Segments row + Generate button -->
+  <div style="display:grid;grid-template-columns:1fr auto;gap:1.5rem;align-items:end;">
+    <div class="field-group" style="margin-bottom:0;">
+      <label>Segments to Include</label>
+      <div class="segment-grid" style="grid-template-columns:repeat(5,1fr);">
+        <button class="seg-toggle active" data-seg="weather"><span class="dot"></span>&#127784; Weather</button>
+        <button class="seg-toggle active" data-seg="news"><span class="dot"></span>&#128240; Local News</button>
+        <button class="seg-toggle active" data-seg="events"><span class="dot"></span>&#127881; Events</button>
+        <button class="seg-toggle active" data-seg="birthday"><span class="dot"></span>&#127874; Birthdays</button>
+        <button class="seg-toggle active" data-seg="trending"><span class="dot"></span>&#128200; Trending</button>
+        <button class="seg-toggle active" data-seg="music"><span class="dot"></span>&#127925; Music News</button>
+        <button class="seg-toggle" data-seg="sports"><span class="dot"></span>&#127944; Sports</button>
+        <button class="seg-toggle" data-seg="viral"><span class="dot"></span>&#128247; Viral News</button>
+        <button class="seg-toggle" data-seg="trivia"><span class="dot"></span>&#129300; Trivia</button>
+      </div>
+    </div>
+    <button class="gen-btn" id="genBtn" onclick="generatePrep()" style="width:160px;margin-top:0;white-space:nowrap;">&#9654; Generate</button>
+  </div>
+
   <div id="setupError"></div>
 </div>
 
@@ -656,6 +661,7 @@ Keep items concise, vivid, and radio-ready. The talkBreak should sound conversat
 
     const container = document.getElementById('segmentsContainer');
     container.innerHTML = '';
+    container.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:1rem;';
 
     segs.forEach(segKey => {
       const segData = data[segKey];
