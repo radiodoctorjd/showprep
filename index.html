@@ -648,12 +648,30 @@ The talkBreak is what the DJ reads live. Make it sound human — like they just 
       }
 
       const rawText = data.content.filter(b => b.type === 'text').map(b => b.text).join('');
-      const clean = rawText.replace(/```json|```/g, '').trim();
+      const clean = rawText.replace(/^```json\s*/,'').replace(/```\s*$/,'').trim();
 
       let parsed;
       try { parsed = JSON.parse(clean); } catch(e) {
         throw new Error('Could not parse AI response as JSON. Raw: ' + clean.slice(0, 200));
       }
+
+      // Normalize keys — Claude sometimes uses camelCase, we need our keys
+      const keyMap = {
+        localNews: 'news',
+        communityEvents: 'events',
+        celebrityBirthdays: 'birthday',
+        trendingTopics: 'trending',
+        musicNews: 'music',
+        sportsRecap: 'sports',
+        viralWeirdNews: 'viral',
+        triviaAndFunFacts: 'trivia',
+        weatherForecast: 'weather',
+      };
+      const normalized = {};
+      for (const [k, v] of Object.entries(parsed)) {
+        normalized[keyMap[k] || k] = v;
+      }
+      parsed = normalized;
 
       renderResults(parsed, segs, location, format, genre, today);
 
