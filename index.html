@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ShowPrep — Radio Show Prep Tool</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --navy: #0d1b2a;
+    --navy-mid: #1a2d42;
+    --navy-light: #243850;
+    --amber: #f0a500;
+    --amber-dim: #c4841a;
+    --amber-pale: #fdf0d0;
+    --red-on: #e63946;
+    --white: #f7f9fc;
+    --text-muted: #8fa8c8;
+    --text-body: #d0dde8;
+    --card-bg: #162032;
+    --card-border: #243850;
+    --font: 'Segoe UI', system-ui, sans-serif;
+    --mono: 'Courier New', monospace;
+  }
+
+  body {
+    background: var(--navy);
+    color: var(--text-body);
+    font-family: var(--font);
+    min-height: 100vh;
+  }
+
+  /* ── Header ── */
+  header {
+    background: var(--navy-mid);
+    border-bottom: 2px solid var(--amber);
+    padding: 0 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 60px;
+  }
+
+  .logo {
+    font-family: var(--mono);
+    font-size: 1.4rem;
+    font-weight: bold;
+    color: var(--amber);
+    letter-spacing: 0.06em;
+  }
+
+  .logo span {
+    color: var(--white);
+  }
+
+  .on-air-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    font-weight: bold;
+    letter-spacing: 0.15em;
+    color: var(--red-on);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .on-air-badge.visible { opacity: 1; }
+
+  .on-air-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--red-on);
+    animation: pulse 1s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  /* ── Setup panel ── */
+  #setup {
+    max-width: 560px;
+    margin: 5rem auto 0;
+    padding: 0 1.5rem;
+  }
+
+  .setup-eyebrow {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.15em;
+    color: var(--amber);
+    text-transform: uppercase;
+    margin-bottom: 0.75rem;
+  }
+
+  .setup-title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--white);
+    line-height: 1.2;
+    margin-bottom: 0.5rem;
+  }
+
+  .setup-subtitle {
+    font-size: 0.95rem;
+    color: var(--text-muted);
+    margin-bottom: 2.5rem;
+    line-height: 1.6;
+  }
+
+  .field-group {
+    margin-bottom: 1.25rem;
+  }
+
+  label {
+    display: block;
+    font-size: 0.78rem;
+    font-family: var(--mono);
+    letter-spacing: 0.08em;
+    color: var(--amber);
+    text-transform: uppercase;
+    margin-bottom: 0.4rem;
+  }
+
+  input[type="text"], select, textarea {
+    width: 100%;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    color: var(--white);
+    font-family: var(--font);
+    font-size: 0.95rem;
+    padding: 0.65rem 0.9rem;
+    border-radius: 6px;
+    outline: none;
+    transition: border-color 0.2s;
+    appearance: none;
+  }
+
+  input[type="text"]:focus, select:focus, textarea:focus {
+    border-color: var(--amber);
+  }
+
+  select option { background: var(--navy-mid); }
+
+  .segment-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+  }
+
+  .seg-toggle {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .seg-toggle.active {
+    border-color: var(--amber);
+    color: var(--white);
+    background: rgba(240,165,0,0.08);
+  }
+
+  .seg-toggle .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--card-border);
+    transition: background 0.15s;
+    flex-shrink: 0;
+  }
+
+  .seg-toggle.active .dot { background: var(--amber); }
+
+  .gen-btn {
+    width: 100%;
+    padding: 0.8rem;
+    background: var(--amber);
+    color: var(--navy);
+    font-family: var(--mono);
+    font-size: 0.9rem;
+    font-weight: bold;
+    letter-spacing: 0.1em;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    margin-top: 1.5rem;
+    transition: background 0.2s, transform 0.1s;
+    text-transform: uppercase;
+  }
+
+  .gen-btn:hover { background: #ffc42a; }
+  .gen-btn:active { transform: scale(0.99); }
+  .gen-btn:disabled { background: var(--amber-dim); cursor: not-allowed; opacity: 0.6; }
+
+  /* ── Loading ── */
+  #loading {
+    display: none;
+    text-align: center;
+    padding: 5rem 2rem;
+  }
+
+  .loading-bars {
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    gap: 4px;
+    height: 40px;
+    margin-bottom: 1.5rem;
+  }
+
+  .loading-bars span {
+    width: 5px;
+    background: var(--amber);
+    border-radius: 3px;
+    animation: equalizer 1s ease-in-out infinite;
+  }
+
+  .loading-bars span:nth-child(1) { animation-delay: 0s; height: 10px; }
+  .loading-bars span:nth-child(2) { animation-delay: 0.1s; height: 20px; }
+  .loading-bars span:nth-child(3) { animation-delay: 0.2s; height: 30px; }
+  .loading-bars span:nth-child(4) { animation-delay: 0.3s; height: 20px; }
+  .loading-bars span:nth-child(5) { animation-delay: 0.4s; height: 10px; }
+
+  @keyframes equalizer {
+    0%, 100% { transform: scaleY(1); }
+    50% { transform: scaleY(2.5); }
+  }
+
+  .loading-text {
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    color: var(--amber);
+    letter-spacing: 0.1em;
+  }
+
+  /* ── Results ── */
+  #results {
+    display: none;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 1.5rem 1.5rem 4rem;
+  }
+
+  .results-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--card-border);
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+
+  .results-meta {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    letter-spacing: 0.05em;
+  }
+
+  .results-meta strong { color: var(--amber); }
+
+  .reset-btn {
+    background: transparent;
+    border: 1px solid var(--card-border);
+    color: var(--text-muted);
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    padding: 0.4rem 0.9rem;
+    border-radius: 4px;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: all 0.15s;
+  }
+
+  .reset-btn:hover { border-color: var(--amber); color: var(--amber); }
+
+  .print-btn {
+    background: var(--amber);
+    border: none;
+    color: var(--navy);
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    font-weight: bold;
+    letter-spacing: 0.08em;
+    padding: 0.4rem 0.9rem;
+    border-radius: 4px;
+    cursor: pointer;
+    text-transform: uppercase;
+  }
+
+  /* ── Segment cards ── */
+  .segment {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    overflow: hidden;
+  }
+
+  .segment-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0.65rem 1rem;
+    background: var(--navy-light);
+    border-bottom: 1px solid var(--card-border);
+  }
+
+  .seg-label {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    font-weight: bold;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 3px;
+  }
+
+  .seg-label.weather  { background: #1a3a5c; color: #7bbfee; }
+  .seg-label.news     { background: #2a1a1a; color: #ee8877; }
+  .seg-label.events   { background: #1a2a1a; color: #88cc77; }
+  .seg-label.birthday { background: #2a1a2a; color: #cc88dd; }
+  .seg-label.trending { background: #2a2a1a; color: #ddcc55; }
+  .seg-label.music    { background: #1a1a3a; color: #8899ee; }
+  .seg-label.sports   { background: #1a2820; color: #55cc99; }
+  .seg-label.viral    { background: #2a1f1a; color: #ee9966; }
+  .seg-label.trivia   { background: #221a2a; color: #bb88ff; }
+
+  .seg-title {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--white);
+  }
+
+  .segment-body {
+    padding: 1rem 1.25rem;
+    font-size: 0.9rem;
+    line-height: 1.7;
+    color: var(--text-body);
+  }
+
+  .segment-body ul {
+    list-style: none;
+    padding: 0;
+  }
+
+  .segment-body ul li {
+    padding: 0.35rem 0;
+    border-bottom: 1px solid rgba(36,56,80,0.6);
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .segment-body ul li:last-child { border-bottom: none; }
+
+  .bullet {
+    color: var(--amber);
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  .talk-line {
+    background: rgba(240,165,0,0.06);
+    border-left: 3px solid var(--amber);
+    padding: 0.5rem 0.75rem;
+    margin-top: 0.75rem;
+    font-style: italic;
+    font-size: 0.85rem;
+    color: var(--amber-pale);
+    border-radius: 0 4px 4px 0;
+  }
+
+  .talk-label {
+    font-style: normal;
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    letter-spacing: 0.1em;
+    color: var(--amber);
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  /* Error state */
+  .error-box {
+    background: rgba(230,57,70,0.1);
+    border: 1px solid rgba(230,57,70,0.3);
+    border-radius: 6px;
+    padding: 1rem 1.25rem;
+    color: #f08090;
+    font-size: 0.88rem;
+    margin-top: 1rem;
+  }
+
+  @media print {
+    header, .reset-btn, .print-btn, #setup, #loading { display: none !important; }
+    body { background: white; color: black; }
+    .segment { border: 1px solid #ccc; page-break-inside: avoid; }
+    .segment-header { background: #f0f0f0; }
+    .seg-title { color: black; }
+    .segment-body { color: #333; }
+    #results { display: block !important; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">SHOW<span>PREP</span></div>
+  <div class="on-air-badge" id="onAirBadge">
+    <div class="on-air-dot"></div>
+    ON AIR
+  </div>
+</header>
+
+<!-- Setup -->
+<div id="setup">
+  <p class="setup-eyebrow">&#9679; Radio Show Prep Tool</p>
+  <h1 class="setup-title">Your show,<br>prepped in seconds.</h1>
+  <p class="setup-subtitle">Enter your market and show format. We'll generate everything you need to fill the air — weather, news, trending topics, celebrity birthdays, and more.</p>
+
+  <div class="field-group">
+    <label for="location">City / Market</label>
+    <input type="text" id="location" placeholder="e.g. Burlington, VT or Nashville, TN" />
+  </div>
+
+  <div class="field-group">
+    <label for="format">Show Format</label>
+    <select id="format">
+      <option value="morning drive (5am–10am), high energy, commuter-focused">&#9728; Morning Drive (5am – 10am)</option>
+      <option value="midday (10am–3pm), relaxed and conversational">&#9788; Midday (10am – 3pm)</option>
+      <option value="afternoon drive (3pm–7pm), high energy, commuter-focused">&#128663; Afternoon Drive (3pm – 7pm)</option>
+      <option value="evening/night show (7pm–midnight), chill and music-heavy">&#9790; Evening / Night Show</option>
+      <option value="weekend show, relaxed and fun">&#127774; Weekend Show</option>
+    </select>
+  </div>
+
+  <div class="field-group">
+    <label for="genre">Music Format</label>
+    <select id="genre">
+      <option value="Top 40/Pop">Top 40 / Pop</option>
+      <option value="Country">Country</option>
+      <option value="Hip-Hop/R&B">Hip-Hop / R&amp;B</option>
+      <option value="Rock/Alternative">Rock / Alternative</option>
+      <option value="Adult Contemporary">Adult Contemporary</option>
+      <option value="Classic Hits">Classic Hits / Oldies</option>
+      <option value="News/Talk">News / Talk</option>
+    </select>
+  </div>
+
+  <div class="field-group">
+    <label>Segments to Include</label>
+    <div class="segment-grid">
+      <button class="seg-toggle active" data-seg="weather"><span class="dot"></span>&#127784; Weather Forecast</button>
+      <button class="seg-toggle active" data-seg="news"><span class="dot"></span>&#128240; Local News</button>
+      <button class="seg-toggle active" data-seg="events"><span class="dot"></span>&#127881; Community Events</button>
+      <button class="seg-toggle active" data-seg="birthday"><span class="dot"></span>&#127874; Celebrity Birthdays</button>
+      <button class="seg-toggle active" data-seg="trending"><span class="dot"></span>&#128200; Trending Topics</button>
+      <button class="seg-toggle active" data-seg="music"><span class="dot"></span>&#127925; Music News</button>
+      <button class="seg-toggle" data-seg="sports"><span class="dot"></span>&#127944; Sports Recap</button>
+      <button class="seg-toggle" data-seg="viral"><span class="dot"></span>&#128247; Viral / Weird News</button>
+      <button class="seg-toggle" data-seg="trivia"><span class="dot"></span>&#129300; Trivia / Fun Fact</button>
+    </div>
+  </div>
+
+  <button class="gen-btn" id="genBtn" onclick="generatePrep()">&#9654; Generate Show Prep</button>
+  <div id="setupError"></div>
+</div>
+
+<!-- Loading -->
+<div id="loading">
+  <div class="loading-bars">
+    <span></span><span></span><span></span><span></span><span></span>
+  </div>
+  <p class="loading-text" id="loadingText">PULLING PREP...</p>
+</div>
+
+<!-- Results -->
+<div id="results">
+  <div class="results-header">
+    <div class="results-meta">
+      <strong id="resultMarket"></strong> &nbsp;·&nbsp; <span id="resultFormat"></span> &nbsp;·&nbsp; <span id="resultDate"></span>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button class="reset-btn" onclick="resetForm()">&#8592; New Prep</button>
+      <button class="print-btn" onclick="window.print()">&#128438; Print Rundown</button>
+    </div>
+  </div>
+  <div id="segmentsContainer"></div>
+</div>
+
+<script>
+  const SEG_TOGGLES = document.querySelectorAll('.seg-toggle');
+  SEG_TOGGLES.forEach(btn => {
+    btn.addEventListener('click', () => btn.classList.toggle('active'));
+  });
+
+  const LOADING_MESSAGES = [
+    "PULLING PREP...",
+    "CHECKING WEATHER RADAR...",
+    "SCANNING TRENDING TOPICS...",
+    "FINDING CELEBRITY BIRTHDAYS...",
+    "WRITING YOUR TALK BREAKS..."
+  ];
+
+  function getActiveSegments() {
+    return [...SEG_TOGGLES].filter(b => b.classList.contains('active')).map(b => b.dataset.seg);
+  }
+
+  const SEG_META = {
+    weather:  { label: 'weather',  title: '&#127784; Weather Forecast',     labelText: 'WEATHER'  },
+    news:     { label: 'news',     title: '&#128240; Local News',            labelText: 'NEWS'     },
+    events:   { label: 'events',   title: '&#127881; Community Events',      labelText: 'EVENTS'   },
+    birthday: { label: 'birthday', title: '&#127874; Celebrity Birthdays',   labelText: 'BIRTHDAYS'},
+    trending: { label: 'trending', title: '&#128200; What\'s Trending',      labelText: 'TRENDING' },
+    music:    { label: 'music',    title: '&#127925; Music News',            labelText: 'MUSIC'    },
+    sports:   { label: 'sports',   title: '&#127944; Sports Recap',          labelText: 'SPORTS'   },
+    viral:    { label: 'viral',    title: '&#128247; Viral & Weird News',    labelText: 'VIRAL'    },
+    trivia:   { label: 'trivia',   title: '&#129300; Trivia & Fun Facts',    labelText: 'TRIVIA'   },
+  };
+
+  async function generatePrep() {
+    const location = document.getElementById('location').value.trim();
+    const format = document.getElementById('format').value;
+    const genre = document.getElementById('genre').value;
+    const segs = getActiveSegments();
+    const errEl = document.getElementById('setupError');
+    errEl.innerHTML = '';
+
+    if (!location) {
+      errEl.innerHTML = '<div class="error-box">&#9888; Please enter a city or market.</div>';
+      return;
+    }
+    if (segs.length === 0) {
+      errEl.innerHTML = '<div class="error-box">&#9888; Please select at least one segment.</div>';
+      return;
+    }
+
+    document.getElementById('setup').style.display = 'none';
+    document.getElementById('results').style.display = 'none';
+    const loadingEl = document.getElementById('loading');
+    loadingEl.style.display = 'block';
+
+    let msgIdx = 0;
+    const msgInterval = setInterval(() => {
+      msgIdx = (msgIdx + 1) % LOADING_MESSAGES.length;
+      document.getElementById('loadingText').textContent = LOADING_MESSAGES[msgIdx];
+    }, 1800);
+
+    const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+    const segmentInstructions = {
+      weather: `WEATHER: Give a realistic, detailed weather forecast for the ${location} area for today and the next 2 days. Include temperatures (high/low), conditions, any notable weather warnings. Then write a short, natural-sounding talk break (2-3 sentences) for the host to read on-air.`,
+      news: `LOCAL NEWS: Generate 3-4 local news stories that might realistically be happening in or near ${location}. Each story should have a headline and 2-3 bullet points of key facts. Then write a punchy one-liner intro the DJ could use.`,
+      events: `COMMUNITY EVENTS: List 4-5 realistic local community events happening this week in ${location}. Include event name, date/time, location, and a brief description. Include a mix of free and paid events.`,
+      birthday: `CELEBRITY BIRTHDAYS: List 4-5 celebrities with birthdays today (${today}). Include their name, age they're turning, and a quick interesting fact about them. Focus on celebrities relevant to a ${genre} radio audience.`,
+      trending: `TRENDING TOPICS: What are 4-5 topics currently trending on social media that would be interesting to a ${genre} radio audience? For each: the topic, why it's trending, and a suggested audience question or phone topic the DJ could throw to listeners.`,
+      music: `MUSIC NEWS: Give 3-4 music news stories relevant to a ${genre} station. Include new releases, tour announcements, artist news, chart notes. Write it like a music reporter's briefing.`,
+      sports: `SPORTS RECAP: Give highlights from last night's or recent sports news. Cover the major leagues (NFL, NBA, MLB, NHL depending on season) with scores and standout moments. Keep it punchy.`,
+      viral: `VIRAL & WEIRD NEWS: Find 3 fun, weird, or viral news stories from around the world that would make great on-air chat fodder. Each should have a headline, the key facts, and why it's funny or interesting.`,
+      trivia: `TRIVIA & FUN FACTS: Provide 2-3 trivia questions (with answers) and 2-3 surprising fun facts that would work well as on-air trivia bits for a ${genre} audience. Make them feel fresh, not overdone.`,
+    };
+
+    const requestedInstructions = segs.map(s => segmentInstructions[s]).join('\n\n');
+
+    const systemPrompt = `You are an experienced radio show prep writer generating content for a ${genre} radio station in ${location}. Today is ${today}. The show is a ${format} show.
+
+Generate realistic, entertaining, and locally relevant show prep content. Write in a style that's appropriate for ${genre} radio — engaging, punchy, and easy to read on-air.
+
+You MUST respond with ONLY valid JSON. No markdown, no explanation, no preamble. The JSON must have a key for each requested segment using these exact keys: ${segs.join(', ')}.
+
+Each segment value is an object with:
+- "items": array of strings (bullet points, facts, story headlines, etc.)
+- "talkBreak": a 2-3 sentence suggested on-air talk break the host can read or riff from
+
+For news and events segments, each item in "items" should be formatted as: "HEADLINE || detail1 | detail2 | detail3"
+For all other segments, items are simple strings.
+
+Keep items concise, vivid, and radio-ready. The talkBreak should sound conversational and natural, not stiff.`;
+
+    try {
+      const response = await fetch('https://yellow-dust-4e2d.radiodoctorjd.workers.dev/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 3000,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: requestedInstructions }]
+        })
+      });
+
+      const data = await response.json();
+      clearInterval(msgInterval);
+      loadingEl.style.display = 'none';
+
+      if (!response.ok || !data.content) {
+        throw new Error(data.error?.message || 'API error');
+      }
+
+      const rawText = data.content.filter(b => b.type === 'text').map(b => b.text).join('');
+      const clean = rawText.replace(/```json|```/g, '').trim();
+      const parsed = JSON.parse(clean);
+
+      renderResults(parsed, segs, location, format, genre, today);
+
+    } catch (err) {
+      clearInterval(msgInterval);
+      loadingEl.style.display = 'none';
+      document.getElementById('setup').style.display = 'block';
+      document.getElementById('setupError').innerHTML = `<div class="error-box">&#9888; Something went wrong: ${err.message}. Please try again.</div>`;
+    }
+  }
+
+  function renderResults(data, segs, location, format, genre, today) {
+    document.getElementById('resultMarket').textContent = location;
+    document.getElementById('resultFormat').textContent = genre + ' · ' + format.split(',')[0];
+    document.getElementById('resultDate').textContent = today;
+
+    const container = document.getElementById('segmentsContainer');
+    container.innerHTML = '';
+
+    segs.forEach(segKey => {
+      const segData = data[segKey];
+      if (!segData) return;
+      const meta = SEG_META[segKey];
+      const card = document.createElement('div');
+      card.className = 'segment';
+
+      const isHeadlineStyle = (segKey === 'news' || segKey === 'events');
+
+      let itemsHTML = '<ul>';
+      (segData.items || []).forEach(item => {
+        if (isHeadlineStyle && item.includes('||')) {
+          const [headline, ...details] = item.split('||');
+          const detailParts = (details.join('') || '').split('|').map(s => s.trim()).filter(Boolean);
+          itemsHTML += `<li style="flex-direction:column;gap:4px;">
+            <strong style="color:var(--white);font-size:0.88rem;">${headline.trim()}</strong>
+            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:2px;">
+              ${detailParts.map(d => `<span style="font-size:0.78rem;color:var(--text-muted);">&#9656; ${d}</span>`).join('')}
+            </div>
+          </li>`;
+        } else {
+          itemsHTML += `<li><span class="bullet">&#9656;</span><span>${item}</span></li>`;
+        }
+      });
+      itemsHTML += '</ul>';
+
+      card.innerHTML = `
+        <div class="segment-header">
+          <span class="seg-label ${segKey}">${meta.labelText}</span>
+          <span class="seg-title">${meta.title}</span>
+        </div>
+        <div class="segment-body">
+          ${itemsHTML}
+          ${segData.talkBreak ? `<div class="talk-line"><span class="talk-label">&#127908; ON-AIR TALK BREAK</span>${segData.talkBreak}</div>` : ''}
+        </div>`;
+
+      container.appendChild(card);
+    });
+
+    document.getElementById('results').style.display = 'block';
+    document.getElementById('onAirBadge').classList.add('visible');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function resetForm() {
+    document.getElementById('results').style.display = 'none';
+    document.getElementById('onAirBadge').classList.remove('visible');
+    document.getElementById('setup').style.display = 'block';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+</script>
+</body>
+</html>
