@@ -683,22 +683,74 @@ async function loadNews(){
 }
 
 /* ══════════════════════════════════════════
-   TRENDING — E! Online + People + Entertainment Tonight RSS
-   Pop culture & celebrity news, perfect for radio show prep
+   TRENDING — Google Trends RSS (trending?geo=US export feed)
+   Fallback: E! Online + People + ET Online
 ══════════════════════════════════════════ */
 async function loadTrending(){
   setLoading('body-trending');
+
+  // Try Google Trends RSS first (the export feed from trends.google.com/trending?geo=US)
+  const googleTrendsUrls=[
+    'https://trends.google.com/trending/rss?geo=US',
+    'https://trends.google.com/trends/trendingsearches/daily/rss?geo=US',
+  ];
+
+  for(const trendUrl of googleTrendsUrls){
+    try {
+      const xml=await fetchRSS(trendUrl);
+      const items=Array.from(xml.querySelectorAll('item'));
+      if(items.length===0) continue;
+
+      let html='<div class="tag-cloud" style="margin-bottom:14px">';
+      items.slice(0,15).forEach(item=>{
+        const title=strip(item.querySelector('title')?.textContent||'');
+        if(!title) return;
+        const searchUrl=`https://www.google.com/search?q=${encodeURIComponent(title)}`;
+        html+=`<span class="tag"><a href="${searchUrl}" target="_blank" style="color:var(--gold);text-decoration:none">${title}</a></span>`;
+      });
+      html+='</div>';
+
+      items.slice(0,10).forEach(item=>{
+        const title=strip(item.querySelector('title')?.textContent||'');
+        if(!title) return;
+        // Google Trends RSS includes ht:approx_traffic and ht:news_item elements
+        const traffic=item.getElementsByTagNameNS('*','approx_traffic')[0]?.textContent||
+                      item.querySelector('approx_traffic')?.textContent||'';
+        const newsTitle=item.getElementsByTagNameNS('*','news_item_title')[0]?.textContent||
+                        item.querySelector('news_item_title')?.textContent||'';
+        const newsUrl=item.getElementsByTagNameNS('*','news_item_url')[0]?.textContent||
+                      item.querySelector('news_item_url')?.textContent||'';
+        const newsSnippet=strip(item.getElementsByTagNameNS('*','news_item_snippet')[0]?.textContent||
+                                item.querySelector('news_item_snippet')?.textContent||'').slice(0,120);
+        const searchUrl=`https://www.google.com/search?q=${encodeURIComponent(title)}`;
+
+        html+=`<div class="item">
+          <div class="item-label">🔥 TRENDING${traffic?' · '+traffic+' searches':''}</div>
+          <div class="item-title"><a href="${searchUrl}" target="_blank">${title}</a></div>
+          ${newsTitle?`<div class="item-body" style="margin-top:4px">
+            ${newsUrl?`<a href="${newsUrl}" target="_blank" style="color:var(--text)">${newsTitle}</a>`:newsTitle}
+          </div>`:''}
+          ${newsSnippet?`<div class="item-body" style="color:var(--muted);margin-top:2px">${newsSnippet}${newsSnippet.length>=120?'…':''}</div>`:''}
+        </div>`;
+      });
+
+      html+='<div class="source-credit">Source: Google Trends — trends.google.com/trending?geo=US</div>';
+      document.getElementById('body-trending').innerHTML=html;
+      return; // success — done
+    } catch(e){ /* try next URL or fall through to backup */ }
+  }
+
+  // Fallback: pop culture RSS feeds
   try {
     const sources=[
-      {url:'https://www.eonline.com/syndication/feeds/rssfeeds/topstories.xml', name:'E! Online', cat:'POP CULTURE'},
-      {url:'https://people.com/feed/',                                           name:'People',   cat:'CELEBRITY'},
+      {url:'https://www.eonline.com/syndication/feeds/rssfeeds/topstories.xml', name:'E! Online',  cat:'POP CULTURE'},
+      {url:'https://people.com/feed/',                                           name:'People',    cat:'CELEBRITY'},
       {url:'https://www.etonline.com/news/rss',                                 name:'ET Online', cat:'ENTERTAINMENT'},
       {url:'https://www.usmagazine.com/feed/',                                  name:'Us Weekly', cat:'CELEBRITY'},
     ];
 
     const allItems=[];
     const results=await Promise.allSettled(sources.map(s=>fetchRSS(s.url).then(xml=>({xml,src:s}))));
-
     results.forEach(r=>{
       if(r.status!=='fulfilled') return;
       const {xml,src}=r.value;
@@ -711,9 +763,8 @@ async function loadTrending(){
       });
     });
 
-    if(allItems.length===0) throw new Error('No trending items loaded — proxies may be blocked');
+    if(allItems.length===0) throw new Error('All trending sources failed');
 
-    // Dedupe by similar title, keep freshest
     const seen=new Set();
     const deduped=allItems.filter(i=>{
       const key=i.title.slice(0,30).toLowerCase();
@@ -729,7 +780,6 @@ async function loadTrending(){
         ${t.desc?`<div class="item-body">${t.desc}${t.desc.length>=140?'…':''}</div>`:''}
       </div>`;
     });
-
     html+='<div class="source-credit">Sources: E! Online · People · ET Online · Us Weekly</div>';
     document.getElementById('body-trending').innerHTML=html;
   } catch(e){ setError('body-trending',e.message); }
