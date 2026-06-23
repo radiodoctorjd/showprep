@@ -212,14 +212,6 @@
     <div class="card-body" id="body-facts"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
   </div>
 
-  <!-- On This Day in Music -->
-  <div class="card">
-    <div class="card-header">
-      <div class="card-title">🎵 On This Day in Music</div>
-      <button class="refresh-btn" onclick="loadMusicHistory()">↻ Refresh</button>
-    </div>
-    <div class="card-body" id="body-musichistory"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
-  </div>
 
   <!-- Sports Scores -->
   <div class="card">
@@ -1002,71 +994,6 @@ async function loadFacts(){
 }
 
 /* ══════════════════════════════════════════
-   ON THIS DAY IN MUSIC — thisdayinmusic.com RSS
-   + music-filtered Wikipedia
-══════════════════════════════════════════ */
-async function loadMusicHistory(){
-  setLoading('body-musichistory');
-  try {
-    const mm=String(TODAY.getMonth()+1).padStart(2,'0');
-    const dd=String(TODAY.getDate()).padStart(2,'0');
-    const yr=TODAY.getFullYear();
-
-    const musicTerms=['album','single','record','chart','billboard','grammy','rock','pop',
-      'band','tour','concert','music','song','released','recording','studio','performed',
-      'beatles','rolling stones','elvis','bowie','springsteen','jackson','madonna','prince',
-      'born','died','formed','disbanded','number one','topped','hit','platinum','gold'];
-
-    // Wikipedia music-filtered events for today's date only
-    const wikiRes=await fetch(`https://en.wikipedia.org/api/rest_v1/feed/onthisday/events/${mm}/${dd}`);
-    const items=[];
-
-    if(wikiRes.ok){
-      const data=await wikiRes.json();
-      const musicEvents=(data.events||[])
-        .filter(ev=>{ const t=(ev.text||'').toLowerCase(); return musicTerms.some(m=>t.includes(m)); })
-        .sort((a,b)=>a.year-b.year); // oldest to newest
-      musicEvents.forEach(ev=>{
-        const page=ev.pages&&ev.pages[0];
-        const url=page&&page.content_urls&&page.content_urls.desktop?page.content_urls.desktop.page:null;
-        items.push({year:String(ev.year),headline:ev.text,detail:'',url,source:'Wikipedia'});
-      });
-    }
-
-    // Also try thisdayinmusic.com — filter strictly to today's month/day in title/desc
-    try {
-      const xml=await fetchRSS('https://www.thisdayinmusic.com/feed/');
-      const todayMonthDay=TODAY.toLocaleDateString('en-US',{month:'long',day:'numeric'}); // e.g. "June 23"
-      const mmdd=`${String(TODAY.getMonth()+1).padStart(2,'0')}/${String(TODAY.getDate()).padStart(2,'0')}`;
-      Array.from(xml.querySelectorAll('item')).forEach(item=>{
-        const title=strip(item.querySelector('title')?.textContent||'');
-        const link=(item.querySelector('link')?.textContent||item.querySelector('guid')?.textContent||'').trim();
-        const desc=strip(item.querySelector('description')?.textContent||'').slice(0,120);
-        const pubDate=item.querySelector('pubDate')?.textContent||'';
-        // Only include if published today
-        const pd=new Date(pubDate);
-        const isToday=pd.getMonth()===TODAY.getMonth()&&pd.getDate()===TODAY.getDate();
-        if(title&&isToday) items.push({year:fmt(pubDate),headline:title,detail:desc,url:link,source:'This Day in Music'});
-      });
-    } catch(e){}
-
-    if(items.length===0) throw new Error('No music history events found for today');
-
-    let html=`<div style="font-family:'Courier Prime',monospace;font-size:11px;color:var(--muted);margin-bottom:10px;letter-spacing:1px;text-transform:uppercase">
-      ${TODAY.toLocaleDateString('en-US',{month:'long',day:'numeric'})} in Music History</div>`;
-    items.slice(0,10).forEach(it=>{
-      html+=`<div class="item">
-        <div class="item-label">🎵 ${it.year} · ${it.source}</div>
-        <div class="item-title">${it.url?`<a href="${it.url}" target="_blank">${it.headline}</a>`:it.headline}</div>
-        ${it.detail?`<div class="item-body">${it.detail}</div>`:''}
-      </div>`;
-    });
-    html+='<div class="source-credit">Sources: Wikipedia · This Day in Music</div>';
-    document.getElementById('body-musichistory').innerHTML=html;
-  } catch(e){ setError('body-musichistory',e.message); }
-}
-
-/* ══════════════════════════════════════════
    SPORTS SCORES — ESPN public API (no key)
    Yesterday's final scores + today's schedule
 ══════════════════════════════════════════ */
@@ -1366,7 +1293,6 @@ function refreshAll(){
   loadNews();
   loadTrending();
   loadFacts();
-  loadMusicHistory();
   loadSports();
   loadDailyExtras();
   loadNationalDay();
