@@ -194,6 +194,42 @@
     <div class="card-body" id="body-facts"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
   </div>
 
+  <!-- On This Day in Music -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">🎵 On This Day in Music</div>
+      <button class="refresh-btn" onclick="loadMusicHistory()">↻ Refresh</button>
+    </div>
+    <div class="card-body" id="body-musichistory"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
+  </div>
+
+  <!-- Sports Scores -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">🏆 Sports Scores &amp; Schedule</div>
+      <button class="refresh-btn" onclick="loadSports()">↻ Refresh</button>
+    </div>
+    <div class="card-body" id="body-sports"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
+  </div>
+
+  <!-- Sunrise/Sunset + Gas + Lottery -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">🌅 Sun · ⛽ Gas · 🎟 Lottery</div>
+      <button class="refresh-btn" onclick="loadDailyExtras()">↻ Refresh</button>
+    </div>
+    <div class="card-body" id="body-extras"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
+  </div>
+
+  <!-- National Day Calendar -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">📆 National Day Calendar</div>
+      <button class="refresh-btn" onclick="loadNationalDay()">↻ Refresh</button>
+    </div>
+    <div class="card-body" id="body-nationalday"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
+  </div>
+
 </div>
 
 <footer>92.1 WVTK · <span>Addison County's Radio Station</span> · Show Prep Dashboard</footer>
@@ -948,6 +984,314 @@ async function loadFacts(){
 }
 
 /* ══════════════════════════════════════════
+   ON THIS DAY IN MUSIC — thisdayinmusic.com RSS
+   + music-filtered Wikipedia
+══════════════════════════════════════════ */
+async function loadMusicHistory(){
+  setLoading('body-musichistory');
+  try {
+    const mm=String(TODAY.getMonth()+1).padStart(2,'0');
+    const dd=String(TODAY.getDate()).padStart(2,'0');
+    const yr=TODAY.getFullYear();
+
+    // thisdayinmusic.com RSS
+    const [tdimRes, wikiRes] = await Promise.allSettled([
+      fetchRSS('https://www.thisdayinmusic.com/feed/'),
+      fetch(`https://en.wikipedia.org/api/rest_v1/feed/onthisday/events/${mm}/${dd}`)
+    ]);
+
+    const musicTerms=['album','single','record','chart','billboard','grammy','rock','pop',
+      'band','tour','concert','music','song','released','recording','studio','performed',
+      'beatles','rolling stones','elvis','bowie','springsteen','jackson','madonna','prince',
+      'born','died','formed','disbanded','number one','topped','hit','platinum','gold'];
+
+    const items=[];
+
+    // thisdayinmusic RSS items
+    if(tdimRes.status==='fulfilled'){
+      Array.from(tdimRes.value.querySelectorAll('item')).slice(0,8).forEach(item=>{
+        const title=strip(item.querySelector('title')?.textContent||'');
+        const link=(item.querySelector('link')?.textContent||item.querySelector('guid')?.textContent||'').trim();
+        const desc=strip(item.querySelector('description')?.textContent||'').slice(0,120);
+        const pubDate=fmt(item.querySelector('pubDate')?.textContent||'');
+        if(title) items.push({year:pubDate,headline:title,detail:desc,url:link,source:'This Day in Music'});
+      });
+    }
+
+    // Wikipedia music-filtered events
+    if(wikiRes.status==='fulfilled'&&wikiRes.value.ok){
+      const data=await wikiRes.value.json();
+      const musicEvents=(data.events||[])
+        .filter(ev=>{
+          const t=(ev.text||'').toLowerCase();
+          return musicTerms.some(m=>t.includes(m));
+        })
+        .sort((a,b)=>b.year-a.year)
+        .slice(0,6);
+      musicEvents.forEach(ev=>{
+        const page=ev.pages&&ev.pages[0];
+        const url=page&&page.content_urls&&page.content_urls.desktop?page.content_urls.desktop.page:null;
+        items.push({year:String(ev.year),headline:ev.text,detail:'',url,source:'Wikipedia'});
+      });
+    }
+
+    if(items.length===0) throw new Error('No music history data available');
+
+    let html='';
+    items.slice(0,10).forEach(it=>{
+      html+=`<div class="item">
+        <div class="item-label">🎵 ${it.year} · ${it.source}</div>
+        <div class="item-title">${it.url?`<a href="${it.url}" target="_blank">${it.headline}</a>`:it.headline}</div>
+        ${it.detail?`<div class="item-body">${it.detail}</div>`:''}
+      </div>`;
+    });
+    html+='<div class="source-credit">Sources: This Day in Music · Wikipedia</div>';
+    document.getElementById('body-musichistory').innerHTML=html;
+  } catch(e){ setError('body-musichistory',e.message); }
+}
+
+/* ══════════════════════════════════════════
+   SPORTS SCORES — ESPN public API (no key)
+══════════════════════════════════════════ */
+async function loadSports(){
+  setLoading('body-sports');
+  try {
+    const base='https://site.api.espn.com/apis/site/v2/sports';
+    const leagues=[
+      {name:'MLB',  url:`${base}/baseball/mlb/scoreboard`},
+      {name:'NBA',  url:`${base}/basketball/nba/scoreboard`},
+      {name:'NFL',  url:`${base}/football/nfl/scoreboard`},
+      {name:'NHL',  url:`${base}/hockey/nhl/scoreboard`},
+    ];
+
+    const results=await Promise.allSettled(leagues.map(l=>
+      fetch(l.url).then(r=>r.json()).then(d=>({...l,data:d}))
+    ));
+
+    let html='';
+    let anyGames=false;
+
+    results.forEach(r=>{
+      if(r.status!=='fulfilled') return;
+      const {name,data}=r.value;
+      const events=(data.events||[]);
+      if(events.length===0) return;
+
+      html+=`<div style="margin-bottom:10px">
+        <div class="item-label" style="margin-bottom:6px">🏆 ${name}</div>`;
+
+      events.slice(0,4).forEach(ev=>{
+        const comps=ev.competitions&&ev.competitions[0];
+        if(!comps) return;
+        const teams=comps.competitors||[];
+        const status=ev.status&&ev.status.type;
+        const statusDesc=status?status.shortDetail||status.description||'':'';
+        const isLive=status&&status.state==='in';
+        const isFinal=status&&status.state==='post';
+
+        if(teams.length>=2){
+          const t1=teams[0], t2=teams[1];
+          const n1=(t1.team&&t1.team.abbreviation)||'';
+          const n2=(t2.team&&t2.team.abbreviation)||'';
+          const s1=t1.score||'';
+          const s2=t2.score||'';
+          anyGames=true;
+
+          html+=`<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:13px">
+            <span style="color:${t1.winner?'#fff':'var(--muted)'}"><strong>${n1}</strong>${s1?' '+s1:''}</span>
+            <span style="font-size:11px;color:${isLive?'var(--on-air)':'var(--muted)'};font-family:'Courier Prime',monospace">${isLive?'🔴 LIVE':statusDesc}</span>
+            <span style="color:${t2.winner?'#fff':'var(--muted)'}"><strong>${n2}</strong>${s2?' '+s2:''}</span>
+          </div>`;
+        }
+      });
+      html+='</div>';
+    });
+
+    if(!anyGames){
+      html='<div class="item-body" style="color:var(--muted)">No games scheduled today. Check back later.</div>';
+    }
+    html+='<div class="source-credit">Source: ESPN</div>';
+    document.getElementById('body-sports').innerHTML=html;
+  } catch(e){ setError('body-sports',e.message); }
+}
+
+/* ══════════════════════════════════════════
+   DAILY EXTRAS — Sunrise/Sunset + Gas Prices + Lottery
+══════════════════════════════════════════ */
+async function loadDailyExtras(){
+  setLoading('body-extras');
+  try {
+    // Run all three in parallel
+    const [sunRes, gasRes, pbRes, mmRes] = await Promise.allSettled([
+      fetch('https://api.sunrise-sunset.org/json?lat=44.0153&lng=-73.1673&formatted=0'),
+      fetch('https://api.eia.gov/v2/petroleum/pri/gnd/data/?api_key=DEMO&frequency=weekly&data[0]=value&facets[product][]=EPM0&facets[duoarea][]=SVT&sort[0][column]=period&sort[0][direction]=desc&length=1'),
+      fetch('https://data.ny.gov/resource/d6yy-54nr.json?$limit=1&$order=draw_date+DESC&$where=game_type=%27Powerball%27'),
+      fetch('https://data.ny.gov/resource/5xaw-6ayf.json?$limit=1&$order=draw_date+DESC'),
+    ]);
+
+    let html='';
+
+    // ── Sunrise / Sunset ──
+    if(sunRes.status==='fulfilled'&&sunRes.value.ok){
+      const sd=await sunRes.value.json();
+      if(sd.status==='OK'){
+        const r=sd.results;
+        function fmtTime(utcStr){
+          const d=new Date(utcStr);
+          return d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',timeZone:'America/New_York'});
+        }
+        const dawn=fmtTime(r.civil_twilight_begin);
+        const rise=fmtTime(r.sunrise);
+        const set=fmtTime(r.sunset);
+        const dusk=fmtTime(r.civil_twilight_end);
+        const dayLen=r.day_length;
+        const hrs=Math.floor(dayLen/3600);
+        const mins=Math.floor((dayLen%3600)/60);
+        html+=`<div class="item">
+          <div class="item-label">🌅 Sunrise &amp; Sunset — Middlebury VT</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px">
+            <div style="background:var(--mid);border-radius:6px;padding:8px;text-align:center">
+              <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Dawn</div>
+              <div style="font-family:'Oswald',sans-serif;font-size:16px;color:var(--gold)">${dawn}</div>
+            </div>
+            <div style="background:var(--mid);border-radius:6px;padding:8px;text-align:center">
+              <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Sunrise</div>
+              <div style="font-family:'Oswald',sans-serif;font-size:16px;color:var(--gold)">${rise}</div>
+            </div>
+            <div style="background:var(--mid);border-radius:6px;padding:8px;text-align:center">
+              <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Sunset</div>
+              <div style="font-family:'Oswald',sans-serif;font-size:16px;color:#60A5FA">${set}</div>
+            </div>
+            <div style="background:var(--mid);border-radius:6px;padding:8px;text-align:center">
+              <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Dusk</div>
+              <div style="font-family:'Oswald',sans-serif;font-size:16px;color:#60A5FA">${dusk}</div>
+            </div>
+          </div>
+          <div class="item-meta" style="margin-top:6px">Day length: ${hrs}h ${mins}m · sunrise-sunset.org</div>
+        </div>`;
+      }
+    }
+
+    // ── Gas Prices — EIA Vermont weekly average ──
+    html+=`<div class="item">
+      <div class="item-label">⛽ Vermont Gas Prices</div>`;
+    if(gasRes.status==='fulfilled'&&gasRes.value.ok){
+      const gd=await gasRes.value.json();
+      const rows=gd?.response?.data||[];
+      if(rows.length>0){
+        const price=parseFloat(rows[0].value).toFixed(2);
+        const period=rows[0].period||'';
+        html+=`<div style="display:flex;align-items:baseline;gap:10px;margin-top:6px">
+          <div style="font-family:'Oswald',sans-serif;font-size:32px;font-weight:700;color:var(--gold)">$${price}</div>
+          <div style="font-size:12px;color:var(--muted)">per gallon<br>Regular unleaded · week of ${period}</div>
+        </div>
+        <div class="item-meta">Source: US EIA — Vermont state average</div>`;
+      } else {
+        html+=`<div class="item-body" style="color:var(--muted)">Price data unavailable. <a href="https://www.gasbuddy.com/gas-prices/vermont" target="_blank" style="color:var(--gold)">Check GasBuddy →</a></div>`;
+      }
+    } else {
+      html+=`<div class="item-body" style="color:var(--muted)"><a href="https://www.gasbuddy.com/gas-prices/vermont" target="_blank" style="color:var(--gold)">Check Vermont gas prices on GasBuddy →</a></div>`;
+    }
+    html+='</div>';
+
+    // ── Lottery — Powerball + Mega Millions from NY Open Data (covers VT too) ──
+    html+=`<div class="item">
+      <div class="item-label">🎟 Lottery — Latest Winning Numbers</div>`;
+
+    function renderBalls(nums, special, specialLabel, specialColor){
+      const ballStyle=`display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;background:var(--mid);border:1px solid var(--border);font-family:'Oswald',sans-serif;font-size:14px;font-weight:600;margin:2px`;
+      const specStyle=`display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;background:${specialColor};font-family:'Oswald',sans-serif;font-size:14px;font-weight:600;color:#fff;margin:2px`;
+      return nums.map(n=>`<span style="${ballStyle}">${n}</span>`).join('')
+        +(special?`<span style="${specStyle}">${special}</span>`:'');
+    }
+
+    if(pbRes.status==='fulfilled'&&pbRes.value.ok){
+      const pbData=await pbRes.value.json();
+      if(pbData.length>0){
+        const pb=pbData[0];
+        const nums=(pb.winning_numbers||'').split(' ').slice(0,5);
+        const ball=(pb.winning_numbers||'').split(' ').slice(5,6)[0]||pb.multiplier||'';
+        const date=pb.draw_date?new Date(pb.draw_date).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'';
+        html+=`<div style="margin-top:8px">
+          <div style="font-size:12px;color:var(--muted);margin-bottom:4px">🔴 Powerball · ${date}</div>
+          <div>${renderBalls(nums,ball,'PB','#C8102E')}</div>
+        </div>`;
+      }
+    }
+
+    if(mmRes.status==='fulfilled'&&mmRes.value.ok){
+      const mmData=await mmRes.value.json();
+      if(mmData.length>0){
+        const mm=mmData[0];
+        const nums=(mm.winning_numbers||'').split(' ').slice(0,5);
+        const ball=(mm.winning_numbers||'').split(' ').slice(5,6)[0]||'';
+        const date=mm.draw_date?new Date(mm.draw_date).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'';
+        html+=`<div style="margin-top:8px">
+          <div style="font-size:12px;color:var(--muted);margin-bottom:4px">🔵 Mega Millions · ${date}</div>
+          <div>${renderBalls(nums,ball,'MB','#003DA5')}</div>
+        </div>`;
+      }
+    }
+
+    html+=`<div class="item-meta" style="margin-top:6px">Source: NY Open Data (Powerball &amp; Mega Millions) · <a href="https://vtlottery.com" target="_blank" style="color:var(--gold)">vtlottery.com</a></div>
+    </div>`;
+
+    html+='<div class="source-credit">Sources: sunrise-sunset.org · US EIA · NY Open Data</div>';
+    document.getElementById('body-extras').innerHTML=html;
+  } catch(e){ setError('body-extras',e.message); }
+}
+
+/* ══════════════════════════════════════════
+   NATIONAL DAY CALENDAR — nationaltoday.com RSS
+══════════════════════════════════════════ */
+async function loadNationalDay(){
+  setLoading('body-nationalday');
+  try {
+    // Try nationaltoday.com RSS first, then checkiday.com API (free, no key)
+    let items=[];
+
+    try {
+      const xml=await fetchRSS('https://nationaltoday.com/feed/');
+      const today=TODAY.toLocaleDateString('en-US',{month:'long',day:'numeric'});
+      Array.from(xml.querySelectorAll('item')).forEach(item=>{
+        const title=strip(item.querySelector('title')?.textContent||'');
+        const link=(item.querySelector('link')?.textContent||item.querySelector('guid')?.textContent||'').trim();
+        const desc=strip(item.querySelector('description')?.textContent||'').slice(0,100);
+        if(title&&(title.toLowerCase().includes('national')||title.toLowerCase().includes('day')||title.toLowerCase().includes('week')||title.toLowerCase().includes('month'))){
+          items.push({name:title,desc,url:link});
+        }
+      });
+    } catch(e){}
+
+    // Checkiday.com — free API, no key, returns today's holidays/national days
+    if(items.length===0){
+      const ciRes=await fetch(`https://www.checkiday.com/api/3/?d=${TODAY.getMonth()+1}/${TODAY.getDate()}/${TODAY.getFullYear()}`);
+      if(ciRes.ok){
+        const ciData=await ciRes.json();
+        (ciData.holidays||[]).forEach(h=>{
+          items.push({name:h.name,desc:'',url:h.url||''});
+        });
+      }
+    }
+
+    if(items.length===0) throw new Error('No national days found');
+
+    let html=`<div style="font-family:'Courier Prime',monospace;font-size:11px;color:var(--muted);margin-bottom:10px;letter-spacing:1px;text-transform:uppercase">
+      ${TODAY.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})}</div>`;
+
+    items.slice(0,12).forEach(day=>{
+      html+=`<div class="item">
+        <div class="item-title" style="font-size:13px">📆 ${day.url?`<a href="${day.url}" target="_blank">${day.name}</a>`:day.name}</div>
+        ${day.desc?`<div class="item-body">${day.desc}</div>`:''}
+      </div>`;
+    });
+
+    html+='<div class="source-credit">Source: National Today · checkiday.com</div>';
+    document.getElementById('body-nationalday').innerHTML=html;
+  } catch(e){ setError('body-nationalday',e.message); }
+}
+
+/* ══════════════════════════════════════════
    REFRESH ALL
 ══════════════════════════════════════════ */
 function refreshAll(){
@@ -959,6 +1303,10 @@ function refreshAll(){
   loadNews();
   loadTrending();
   loadFacts();
+  loadMusicHistory();
+  loadSports();
+  loadDailyExtras();
+  loadNationalDay();
 }
 
 window.addEventListener('DOMContentLoaded', refreshAll);
