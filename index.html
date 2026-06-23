@@ -1247,7 +1247,9 @@ async function loadDailyExtras(){
       fetch('https://data.ny.gov/resource/5xaw-6ayf.json?$limit=1&$order=draw_date+DESC'),
     ]);
 
-    // Powerball — field names: draw_date, winning_numbers ("n1 n2 n3 n4 n5 pb"), multiplier
+    // ── POWERBALL ──
+    // NY Open Data Powerball: winning_numbers = "n1 n2 n3 n4 n5 powerball" (all in one field)
+    // multiplier = Power Play
     if(nyPbRes.status==='fulfilled'&&nyPbRes.value.ok){
       const rows=await nyPbRes.value.json();
       if(rows.length>0){
@@ -1261,41 +1263,38 @@ async function loadDailyExtras(){
           <div style="font-size:12px;font-weight:600;color:#fff;margin-bottom:2px">🔴 Powerball</div>
           <div style="font-size:11px;color:var(--muted);margin-bottom:5px">${dStr}${pp?' · Power Play: '+pp+'x':''}</div>
           <div>${ballHTML(whites,pb,'#C8102E')}</div>
-          <div style="font-size:10px;color:var(--muted);margin-top:4px">
-            White balls &nbsp;·&nbsp; <span style="color:#C8102E">■</span> Powerball
-          </div>
+          <div style="font-size:10px;color:var(--muted);margin-top:4px">White balls &nbsp;·&nbsp; <span style="color:#C8102E;font-weight:700">●</span> Powerball</div>
         </div>`;
       }
     }
 
-    // Mega Millions — field names: draw_date, winning_numbers ("n1 n2 n3 n4 n5 mb"), multiplier
+    // ── MEGA MILLIONS ──
+    // NY Open Data Mega Millions: winning_numbers = "n1 n2 n3 n4 n5" (5 white balls ONLY)
+    // mega_ball is a SEPARATE field! multiplier = Megaplier
     if(nyMmRes.status==='fulfilled'&&nyMmRes.value.ok){
       const rows=await nyMmRes.value.json();
       if(rows.length>0){
         const row=rows[0];
-        const parts=(row.winning_numbers||'').trim().split(/\s+/);
-        const whites=parts.slice(0,5);
-        const mb=parts[5]||'';
+        const whites=(row.winning_numbers||'').trim().split(/\s+/).filter(Boolean);
+        const mb=(row.mega_ball||'').trim();   // separate field — this is the key fix
         const mp=row.multiplier||'';
         const dStr=row.draw_date?new Date(row.draw_date).toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric',year:'numeric'}):'';
         html+=`<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
           <div style="font-size:12px;font-weight:600;color:#fff;margin-bottom:2px">🔵 Mega Millions</div>
           <div style="font-size:11px;color:var(--muted);margin-bottom:5px">${dStr}${mp?' · Megaplier: '+mp+'x':''}</div>
           <div>${ballHTML(whites,mb,'#003DA5')}</div>
-          <div style="font-size:10px;color:var(--muted);margin-top:4px">
-            White balls &nbsp;·&nbsp; <span style="color:#003DA5">■</span> Mega Ball
-          </div>
+          <div style="font-size:10px;color:var(--muted);margin-top:4px">White balls &nbsp;·&nbsp; <span style="color:#003DA5;font-weight:700">●</span> Mega Ball</div>
         </div>`;
       }
     }
 
-    // Jackpot estimates — link to official sites since no free API has live jackpots
+    // ── JACKPOT LINKS ──
     html+=`<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
-      <div style="font-size:11px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">Next Jackpot Estimates</div>
+      <div style="font-size:11px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">Current Jackpots</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <a href="https://www.powerball.com" target="_blank" style="background:var(--mid);border:1px solid var(--border);border-radius:6px;padding:6px 10px;text-decoration:none;font-size:12px;color:var(--text)">🔴 Powerball →</a>
         <a href="https://www.megamillions.com" target="_blank" style="background:var(--mid);border:1px solid var(--border);border-radius:6px;padding:6px 10px;text-decoration:none;font-size:12px;color:var(--text)">🔵 Mega Millions →</a>
-        <a href="https://vtlottery.com/games/megabucks-doubler" target="_blank" style="background:var(--mid);border:1px solid var(--border);border-radius:6px;padding:6px 10px;text-decoration:none;font-size:12px;color:var(--text)">🟢 Megabucks →</a>
+        <a href="https://vtlottery.com/games/megabucks" target="_blank" style="background:var(--mid);border:1px solid var(--border);border-radius:6px;padding:6px 10px;text-decoration:none;font-size:12px;color:var(--text)">🟢 VT Megabucks →</a>
       </div>
     </div>`;
 
