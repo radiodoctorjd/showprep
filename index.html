@@ -469,26 +469,44 @@ async function loadBirthdays(){
       'prime minister of','president of','king of','queen of','prince of','duke of'
     ];
 
+    // High-value terms that strongly indicate a notable US/global celebrity
+    const highValueTerms=['actor','actress','musician','singer','songwriter','rock','pop',
+      'rapper','comedian','director','producer','nfl','nba','mlb','nhl','olympic',
+      'grammy','oscar','emmy','tony','hall of fame','superstar','legend','icon',
+      'television','film','movie','hollywood','platinum','gold record','chart',
+      'bestselling','pulitzer','nobel','president','vice president','first lady'];
+
     const allScored=(data.births||[])
       .filter(b=>b.pages&&b.pages.length&&b.pages[0].description)
       .map(b=>{
         const p=b.pages[0];
-        const desc=(p.description||'').toLowerCase();
+        const rawDesc=p.description||'';
+        const desc=rawDesc.toLowerCase();
         const age=yr-b.year;
         if(age<=0||age>115) return null;
-        let score=desc.length;
-        usTerms.forEach(t=>{ if(desc.includes(t)) score+=80; });
-        foreignOnlyTerms.forEach(t=>{ if(desc.includes(t)) score-=120; });
-        const rawDesc=p.description||'';
+
+        // Base score from description length (longer = more notable on Wikipedia)
+        let score=rawDesc.length;
+
+        // Strong boost for high-value entertainment/sports terms
+        highValueTerms.forEach(t=>{ if(desc.includes(t)) score+=120; });
+        // Smaller boost for general US relevance
+        usTerms.forEach(t=>{ if(desc.includes(t)) score+=60; });
+        // Penalize non-US-relevant figures
+        foreignOnlyTerms.forEach(t=>{ if(desc.includes(t)) score-=150; });
+
+        // Hard minimum: description must be at least 25 chars and score must be meaningful
+        if(rawDesc.length < 25) return null;
+
         const deceased=rawDesc.toLowerCase().startsWith('was ')||
                        (b.pages[0].deaths&&b.pages[0].deaths.length>0)||
                        rawDesc.match(/\(.*\d{4}.*–.*\d{4}.*\)/)||
                        false;
-        // extract = first paragraph from Wikipedia article, much richer than description
-        // Trim to 2 sentences max for display
+
         const rawExtract=(p.extract||'').replace(/\n.*/s,'').trim();
         const sentences=rawExtract.match(/[^.!?]+[.!?]+/g)||[];
         const extract=sentences.slice(0,2).join(' ').trim();
+
         return {
           year:b.year, age, score, deceased,
           name:p.title, desc:rawDesc, extract,
@@ -497,11 +515,17 @@ async function loadBirthdays(){
       })
       .filter(Boolean)
       .sort((a,b)=>b.score-a.score)
-      .slice(0,20); // grab more so we have enough after splitting
+      .slice(0,30); // wider pool before filtering
+
+    // Only keep people whose score clears a meaningful bar
+    const medianScore=allScored.length?allScored[Math.floor(allScored.length/2)]?.score||0:0;
+    const threshold=Math.max(medianScore, 200); // must beat median or 200 pts minimum
+
+    const qualified=allScored.filter(b=>b.score>=threshold);
 
     // Split into living and deceased, each sorted oldest→youngest
-    const living=allScored.filter(b=>!b.deceased).sort((a,b)=>a.year-b.year).slice(0,8);
-    const deceased=allScored.filter(b=>b.deceased).sort((a,b)=>a.year-b.year).slice(0,5);
+    const living=qualified.filter(b=>!b.deceased).sort((a,b)=>a.year-b.year).slice(0,6);
+    const deceased=qualified.filter(b=>b.deceased).sort((a,b)=>a.year-b.year).slice(0,4);
     const notable=[...living,...deceased];
 
     function renderBirthdays(people){
