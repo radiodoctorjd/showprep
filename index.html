@@ -677,89 +677,69 @@ async function loadNews(){
 }
 
 /* ══════════════════════════════════════════
-   TRENDING — Hacker News API + Wikipedia In The News
-   Both are fully CORS-open, no auth needed
+   TRENDING — Hacker News API (top stories with top comments)
 ══════════════════════════════════════════ */
 async function loadTrending(){
   setLoading('body-trending');
   try {
-    const mm=String(TODAY.getMonth()+1).padStart(2,'0');
-    const dd=String(TODAY.getDate()).padStart(2,'0');
-    const yyyy=TODAY.getFullYear();
+    // Fetch top story IDs
+    const idsRes=await fetch('https://hacker-news.firebaseio.com/v0/topstories.json');
+    if(!idsRes.ok) throw new Error('HN API failed: '+idsRes.status);
+    const ids=await idsRes.json();
 
-    // Fetch HN top story IDs + Wikipedia featured (In The News) in parallel
-    const [hnRes, wikiRes] = await Promise.allSettled([
-      fetch('https://hacker-news.firebaseio.com/v0/topstories.json'),
-      fetch(`https://en.wikipedia.org/api/rest_v1/feed/featured/${yyyy}/${mm}/${dd}`)
-    ]);
-
-    const items=[];
-
-    // ── Wikipedia "In The News" ──
-    if(wikiRes.status==='fulfilled'&&wikiRes.value.ok){
-      const d=await wikiRes.value.json();
-      // news items
-      (d.news||[]).slice(0,4).forEach(n=>{
-        const story=n.story||'';
-        // Strip wiki markup links [[...]] to plain text
-        const clean=story.replace(/'{2,3}/g,'').replace(/\[\[([^\]|]+\|)?([^\]]+)\]\]/g,'$2').slice(0,120);
-        const links=n.links||[];
-        const url=links[0]&&links[0].content_urls&&links[0].content_urls.desktop?links[0].content_urls.desktop.page:null;
-        items.push({category:'IN THE NEWS', title:clean+(clean.length>=120?'…':''), url, source:'Wikipedia'});
-      });
-      // most read articles today
-      (d.mostread&&d.mostread.articles||[]).slice(0,5).forEach(a=>{
-        if(a.title==='Main_Page'||a.title==='Special:Search') return;
-        const url=a.content_urls&&a.content_urls.desktop?a.content_urls.desktop.page:null;
-        items.push({category:'MOST READ TODAY', title:a.title.replace(/_/g,' '), url, source:'Wikipedia'});
-      });
-    }
-
-    // ── Hacker News top stories ──
-    if(hnRes.status==='fulfilled'&&hnRes.value.ok){
-      const ids=await hnRes.value.json();
-      // Fetch top 8 stories in parallel
-      const storyFetches=ids.slice(0,8).map(id=>
+    // Fetch top 10 stories in parallel
+    const stories=await Promise.all(
+      ids.slice(0,10).map(id=>
         fetch(`https://hacker-news.firebaseio.com/v0/item/${id}.json`).then(r=>r.json())
+      )
+    );
+
+    const valid=stories.filter(s=>s&&s.title&&s.type==='story');
+    if(valid.length===0) throw new Error('No stories returned');
+
+    // For each story, fetch top 2 comments to give context
+    async function getTopComments(story){
+      if(!story.kids||story.kids.length===0) return [];
+      const commentIds=story.kids.slice(0,5);
+      const comments=await Promise.all(
+        commentIds.map(id=>
+          fetch(`https://hacker-news.firebaseio.com/v0/item/${id}.json`).then(r=>r.json()).catch(()=>null)
+        )
       );
-      const stories=await Promise.all(storyFetches);
-      stories.forEach(s=>{
-        if(s&&s.title&&s.type==='story'){
-          items.push({
-            category:'TECH & CULTURE',
-            title:s.title,
-            url:s.url||`https://news.ycombinator.com/item?id=${s.id}`,
-            score:s.score,
-            comments:s.descendants||0,
-            source:'Hacker News'
-          });
-        }
-      });
+      return comments
+        .filter(c=>c&&c.text&&!c.dead&&!c.deleted)
+        .map(c=>({
+          text:c.text.replace(/<[^>]+>/g,' ').replace(/&#x27;/g,"'").replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/&#x2F;/g,'/').replace(/\s+/g,' ').trim().slice(0,160),
+          by:c.by||'anonymous'
+        }))
+        .slice(0,2);
     }
 
-    if(items.length===0) throw new Error('No trending data could be loaded');
+    // Fetch comments for all stories in parallel
+    const commentSets=await Promise.all(valid.map(s=>getTopComments(s)));
 
-    // Tag cloud from most-read titles
-    const tagItems=items.filter(i=>i.category==='MOST READ TODAY');
     let html='';
-    if(tagItems.length){
-      html+='<div class="tag-cloud" style="margin-bottom:14px">';
-      tagItems.forEach(t=>{
-        html+=`<span class="tag">${t.url?`<a href="${t.url}" target="_blank" style="color:var(--gold);text-decoration:none">${t.title.slice(0,35)}${t.title.length>35?'…':''}</a>`:t.title}</span>`;
-      });
-      html+='</div>';
-    }
+    valid.forEach((s,i)=>{
+      const discussUrl=`https://news.ycombinator.com/item?id=${s.id}`;
+      const articleUrl=s.url||discussUrl;
+      const score=s.score||0;
+      const comments=s.descendants||0;
+      const domain=s.url?new URL(s.url).hostname.replace('www.',''):'news.ycombinator.com';
+      const topComments=commentSets[i]||[];
 
-    // Full items list
-    items.filter(i=>i.category!=='MOST READ TODAY').forEach(t=>{
       html+=`<div class="item">
-        <div class="item-label">🔥 ${t.category}</div>
-        <div class="item-title">${t.url?`<a href="${t.url}" target="_blank">${t.title}</a>`:t.title}</div>
-        ${t.score!=null?`<div class="item-meta">▲ ${t.score} points · 💬 ${t.comments} comments · ${t.source}</div>`:`<div class="item-meta">${t.source}</div>`}
+        <div class="item-label">🔥 #${i+1} · ${domain}</div>
+        <div class="item-title"><a href="${articleUrl}" target="_blank">${s.title}</a></div>
+        <div class="item-meta" style="margin:3px 0 6px">▲ ${score} points · 💬 <a href="${discussUrl}" target="_blank" style="color:var(--muted)">${comments} comments</a></div>
+        ${topComments.map(c=>`
+          <div style="border-left:2px solid var(--border);padding:4px 0 4px 10px;margin-bottom:4px">
+            <div style="font-size:11px;color:var(--gold);margin-bottom:2px">${c.by}</div>
+            <div style="font-size:12px;color:var(--muted);line-height:1.45">${c.text}${c.text.length>=160?'…':''}</div>
+          </div>`).join('')}
       </div>`;
     });
 
-    html+='<div class="source-credit">Sources: Wikipedia In The News · Hacker News</div>';
+    html+='<div class="source-credit">Source: Hacker News — news.ycombinator.com</div>';
     document.getElementById('body-trending').innerHTML=html;
   } catch(e){ setError('body-trending',e.message); }
 }
