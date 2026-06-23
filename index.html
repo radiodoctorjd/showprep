@@ -535,66 +535,72 @@ async function loadBirthdays(){
 }
 
 /* ══════════════════════════════════════════
-   COMMUNITY EVENTS — RSS feeds, event-keyword filtered
+   COMMUNITY EVENTS — 921wvtk.com Events Calendar feed
+   (The Events Calendar plugin — real structured events with dates/times)
 ══════════════════════════════════════════ */
 function sourcesBar(){
-  return `<div class="sources-bar">🔗 Check live:
-    <a href="https://www.addisonindependent.com" target="_blank">Addison Independent</a> ·
-    <a href="https://www.921wvtk.com" target="_blank">921wvtk.com</a> ·
+  return `<div class="sources-bar">🔗 More events:
+    <a href="https://www.921wvtk.com/events/" target="_blank">921wvtk.com Calendar</a> ·
     <a href="https://frontporchforum.com/middlebury/calendar?area_id=middlebury&neighbor_areas=true" target="_blank">Front Porch Forum</a>
   </div>`;
 }
 
 async function loadEvents(){
   setLoading('body-events');
-  const eventKeywords=['concert','festival','fair','market','farmers','exhibit','exhibition',
-    'performance','show','workshop','class','lecture','talk','reading','meetup','meeting',
-    'fundraiser','gala','auction','bingo','trivia','open mic','open house','tour','walk',
-    'run','race','game','play','musical','film','screening','sale','craft','art','gallery',
-    'volunteer','benefit','dance','parade','celebration','ceremony','awards','annual'];
+  try {
+    // The Events Calendar plugin publishes a dedicated events RSS feed
+    const xml=await fetchRSS('https://www.921wvtk.com/events/feed/');
+    const items=Array.from(xml.querySelectorAll('item'));
 
-  function isEvent(title,desc){
-    const combined=(title+' '+desc).toLowerCase();
-    return eventKeywords.some(k=>combined.includes(k));
-  }
+    if(items.length===0) throw new Error('No events in feed');
 
-  const sources=[
-    {url:'https://www.addisonindependent.com/feed',name:'Addison Independent'},
-    {url:'https://www.921wvtk.com/feed/',name:'921 WVTK'},
-    {url:'https://vtdigger.org/feed/',name:'VT Digger'},
-  ];
+    // The Events Calendar includes custom namespace tags for event dates
+    // tribe:startDate, tribe:endDate, tribe:venue — extract these
+    function getTag(item, tag){
+      // Try both namespaced and plain
+      const ns=item.getElementsByTagNameNS('*', tag);
+      if(ns.length) return ns[0].textContent.trim();
+      const plain=item.querySelector(tag);
+      if(plain) return plain.textContent.trim();
+      return '';
+    }
 
-  let allItems=[];
-  for(const src of sources){
-    try {
-      const xml=await fetchRSS(src.url);
-      Array.from(xml.querySelectorAll('item')).forEach(item=>{
-        const title=strip(item.querySelector('title')?.textContent||'');
-        const link=item.querySelector('link')?.textContent?.trim()||item.querySelector('guid')?.textContent?.trim()||'';
-        const pubDate=fmt(item.querySelector('pubDate')?.textContent||'');
-        const desc=strip(item.querySelector('description')?.textContent||'');
-        if(title) allItems.push({title,link,pubDate,desc,source:src.name});
-      });
-    } catch(e){ /* skip failed source */ }
-  }
+    let html='';
+    items.slice(0,12).forEach(item=>{
+      const title=strip(item.querySelector('title')?.textContent||'');
+      const link=(item.querySelector('link')?.textContent||item.querySelector('guid')?.textContent||'').trim();
+      const desc=strip(item.querySelector('description')?.textContent||'').slice(0,140);
 
-  const events=allItems.filter(i=>isEvent(i.title,i.desc));
-  const displayItems=events.length>=3?events:allItems;
+      // Try tribe event calendar specific fields first, fallback to pubDate
+      let startDate=getTag(item,'startDate')||getTag(item,'start_date')||'';
+      let venue=getTag(item,'venue')||getTag(item,'location')||'';
+      const pubDate=item.querySelector('pubDate')?.textContent||'';
 
-  let html='';
-  if(displayItems.length===0){
-    html='<div class="item-body" style="color:var(--muted)">No items found. Check the live sources below.</div>';
-  } else {
-    displayItems.slice(0,10).forEach(item=>{
+      // Format the date nicely if we got a proper date string
+      let displayDate='';
+      if(startDate){
+        const d=new Date(startDate);
+        displayDate=isNaN(d)?startDate:d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+      } else {
+        displayDate=fmt(pubDate);
+      }
+
       html+=`<div class="event-item">
-        <div class="event-date">📅 ${item.pubDate} · <span style="color:var(--muted)">${item.source}</span></div>
-        <div class="event-name">${item.link?`<a href="${item.link}" target="_blank">${item.title}</a>`:item.title}</div>
-        ${item.desc?`<div class="event-detail">${item.desc.slice(0,120)}${item.desc.length>120?'…':''}</div>`:''}
+        <div class="event-date">📅 ${displayDate}</div>
+        <div class="event-name">${link?`<a href="${link}" target="_blank">${title}</a>`:title}</div>
+        ${venue?`<div class="event-detail">📍 ${venue}</div>`:''}
+        ${desc?`<div class="event-detail" style="margin-top:2px">${desc}${desc.length>=140?'…':''}</div>`:''}
       </div>`;
     });
+
+    html+=sourcesBar();
+    document.getElementById('body-events').innerHTML=html;
+  } catch(e){
+    // Fallback: show links to both sources
+    document.getElementById('body-events').innerHTML=
+      `<div class="item-body" style="color:var(--muted);padding:10px 0">Could not load event feed (${e.message}).<br>Check the live calendars below.</div>`
+      +sourcesBar();
   }
-  html+=sourcesBar();
-  document.getElementById('body-events').innerHTML=html;
 }
 
 /* ══════════════════════════════════════════
