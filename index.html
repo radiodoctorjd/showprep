@@ -105,7 +105,6 @@
 
     @media(max-width:600px){.grid{padding:12px;gap:12px}header{padding:10px 14px}}
   </style>
-  <script src="config.js"></script>
 </head>
 <body>
 
@@ -207,62 +206,6 @@ function shortDate(offset){
   return d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
 }
 
-
-/* ══════════════════════════════════════════
-   CLAUDE API HELPER
-══════════════════════════════════════════ */
-function getKey(){ return window.ANTHROPIC_API_KEY||''; }
-
-async function askClaude(system, user, maxTokens=1200){
-  const key=getKey();
-  if(!key) throw new Error('no-key');
-  const res=await fetch('https://api.anthropic.com/v1/messages',{
-    method:'POST',
-    headers:{
-      'Content-Type':'application/json',
-      'x-api-key':key,
-      'anthropic-version':'2023-06-01',
-      'anthropic-dangerous-direct-browser-access':'true'
-    },
-    body:JSON.stringify({
-      model:'claude-sonnet-4-6',
-      max_tokens:maxTokens,
-      system,
-      messages:[{role:'user',content:user}]
-    })
-  });
-  if(!res.ok){ const e=await res.json().catch(()=>({})); throw new Error(e?.error?.message||'HTTP '+res.status); }
-  const data=await res.json();
-  return data.content.filter(b=>b.type==='text').map(b=>b.text).join('\n');
-}
-
-async function askClaudeSearch(system, user, maxTokens=1500){
-  const key=getKey();
-  if(!key) throw new Error('no-key');
-  const res=await fetch('https://api.anthropic.com/v1/messages',{
-    method:'POST',
-    headers:{
-      'Content-Type':'application/json',
-      'x-api-key':key,
-      'anthropic-version':'2023-06-01',
-      'anthropic-dangerous-direct-browser-access':'true'
-    },
-    body:JSON.stringify({
-      model:'claude-sonnet-4-6',
-      max_tokens:maxTokens,
-      system,
-      tools:[{type:'web_search_20250305',name:'web_search'}],
-      messages:[{role:'user',content:user}]
-    })
-  });
-  if(!res.ok){ const e=await res.json().catch(()=>({})); throw new Error(e?.error?.message||'HTTP '+res.status); }
-  const data=await res.json();
-  return data.content.filter(b=>b.type==='text').map(b=>b.text).join('\n');
-}
-
-function parseJSON(raw){
-  return JSON.parse(raw.replace(/```json\s*/gi,'').replace(/```\s*/g,'').trim());
-}
 
 /* ── WMO CODE MAP ── */
 const WMO={
@@ -479,50 +422,18 @@ async function loadHistory(){
       if(!used.has(e.text)){ picks.push(e); used.add(e.text); }
     }
 
-    // Build raw list for Claude to rewrite
-    const rawEvents=picks.slice(0,7).map(ev=>{
-      const page=ev.pages&&ev.pages[0];
-      const url=page&&page.content_urls&&page.content_urls.desktop&&page.content_urls.desktop.page;
-      return {year:ev.year, text:ev.text, url:url||null};
-    });
-
-    // Show raw while Claude rewrites
     let html=`<div style="font-family:'Courier Prime',monospace;font-size:11px;color:var(--muted);margin-bottom:10px;letter-spacing:1px;text-transform:uppercase">
       ${TODAY.toLocaleDateString('en-US',{month:'long',day:'numeric'})} in History</div>`;
-    rawEvents.forEach(ev=>{
+    picks.slice(0,7).forEach(ev=>{
+      const page=ev.pages&&ev.pages[0];
+      const url=page&&page.content_urls&&page.content_urls.desktop&&page.content_urls.desktop.page;
       html+=`<div class="item">
         <div class="item-label">${ev.year}</div>
-        <div class="item-title">${ev.url?`<a href="${ev.url}" target="_blank">${ev.text}</a>`:ev.text}</div>
+        <div class="item-title">${url?`<a href="${url}" target="_blank">${ev.text}</a>`:ev.text}</div>
       </div>`;
     });
-    html+='<div class="source-credit">Source: Wikipedia · Rewriting for radio…</div>';
+    html+='<div class="source-credit">Source: Wikipedia On This Day API</div>';
     document.getElementById('body-history').innerHTML=html;
-
-    // Now rewrite with Claude
-    try {
-      const rewritten=await askClaude(
-        `You are a morning radio show writer for 92.1 WVTK, a classic hits station in Middlebury Vermont.
-Rewrite historical events into punchy, conversational, radio-friendly copy.
-Return ONLY valid JSON — no markdown, no backticks.
-Schema: { "events": [ { "year": number, "headline": string, "tease": string, "url": string|null } ] }
-headline = short snappy title (under 8 words)
-tease = 1-2 sentences, fun and conversational, something a DJ would actually say on air. Under 40 words.`,
-        `Rewrite these historical events for radio. Keep all facts accurate — just make them fun and engaging:
-${JSON.stringify(rawEvents,null,2)}`
-      );
-      const d=parseJSON(rewritten);
-      let html2=`<div style="font-family:'Courier Prime',monospace;font-size:11px;color:var(--muted);margin-bottom:10px;letter-spacing:1px;text-transform:uppercase">
-        ${TODAY.toLocaleDateString('en-US',{month:'long',day:'numeric'})} in History</div>`;
-      (d.events||[]).forEach(ev=>{
-        html2+=`<div class="item">
-          <div class="item-label">${ev.year}</div>
-          <div class="item-title">${ev.url?`<a href="${ev.url}" target="_blank">${ev.headline}</a>`:ev.headline}</div>
-          <div class="item-body">${ev.tease}</div>
-        </div>`;
-      });
-      html2+='<div class="source-credit">Source: Wikipedia On This Day · Rewritten for radio by Claude</div>';
-      document.getElementById('body-history').innerHTML=html2;
-    } catch(e){ /* keep raw version if Claude fails */ }
   } catch(e){ setError('body-history',e.message); }
 }
 
@@ -602,7 +513,7 @@ async function loadBirthdays(){
           </div>
           <div>
             <div class="birthday-name">${b.url?`<a href="${b.url}" target="_blank">${cleanName}</a>`:cleanName}</div>
-            <div class="birthday-note" style="color:var(--gold);font-size:12px">${b.radiodesc||b.desc}</div>
+            <div class="birthday-note" style="color:var(--gold);font-size:12px">${b.desc}</div>
             <div class="item-meta">Born ${b.year}${b.deceased?' · Passed away':' · Turns '+b.age+' today'}</div>
           </div>
         </div>`;
@@ -611,93 +522,72 @@ async function loadBirthdays(){
       return html;
     }
 
-    // Show raw first
     document.getElementById('body-birthdays').innerHTML=
-      renderBirthdays(notable)+'<div class="source-credit">Source: Wikipedia · Enhancing with Claude…</div>';
-
-    // Rewrite descriptions with Claude
-    try {
-      const bdInput=notable.map(b=>({name:b.name.replace(/_/g,' '),desc:b.desc,year:b.year,age:b.age,deceased:b.deceased}));
-      const rewritten=await askClaude(
-        `You are a morning radio writer for 92.1 WVTK, a classic hits station in Middlebury Vermont.
-Write a short, punchy "known for" description for each celebrity birthday — something a DJ would say on air.
-Return ONLY valid JSON — no markdown, no backticks.
-Schema: { "people": [ { "name": string, "radiodesc": string } ] }
-radiodesc = 1 short sentence, conversational, 10-20 words. Examples:
-"Lead singer of Fleetwood Mac and one of rock's greatest frontmen."
-"Starred in Grease and Saturday Night Fever — the king of 70s cool."
-"Hall of Fame shortstop, 14-time All-Star, and Yankees legend."`,
-        `Write radio-friendly descriptions for these celebrities:
-${JSON.stringify(bdInput,null,2)}`
-      );
-      const d=parseJSON(rewritten);
-      const descMap={};
-      (d.people||[]).forEach(p=>{ descMap[p.name]=p.radiodesc; });
-      const enhanced=notable.map(b=>({...b, radiodesc:descMap[b.name.replace(/_/g,' ')]||b.desc}));
-      document.getElementById('body-birthdays').innerHTML=
-        renderBirthdays(enhanced)+'<div class="source-credit">Source: Wikipedia On This Day · Enhanced by Claude</div>';
-    } catch(e){ /* keep raw */ }
+      renderBirthdays(notable)+'<div class="source-credit">Source: Wikipedia On This Day API</div>';
   } catch(e){ setError('body-birthdays',e.message); }
 }
 
 /* ══════════════════════════════════════════
-   COMMUNITY EVENTS — Claude web search
+   COMMUNITY EVENTS — RSS feeds, event-keyword filtered
 ══════════════════════════════════════════ */
-async function loadEvents(){
-  setLoading('body-events');
-  const todayStr=TODAY.toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
-  try {
-    const raw=await askClaudeSearch(
-      `You are a community calendar assistant for 92.1 WVTK radio in Middlebury, Vermont.
-Search for REAL upcoming community events in Middlebury and Addison County Vermont.
-Return ONLY valid JSON — no markdown, no backticks.
-Schema: { "events": [ { "date": string, "name": string, "location": string, "detail": string, "source": string, "url": string|null } ] }
-Only include genuine events you find — concerts, festivals, markets, fundraisers, community meetings, performances, classes, sports, fairs, art shows, etc.
-Do NOT include news articles, opinion pieces, or press releases unless they announce a specific event with a date and location.
-If you cannot find real events, return an empty events array rather than inventing any.`,
-      `Search for upcoming community events in Middlebury Vermont and Addison County starting ${todayStr}.
-Search: site:addisonindependent.com events calendar
-Search: site:frontporchforum.com middlebury events
-Search: site:921wvtk.com events
-Search: Middlebury Vermont community events ${TODAY.toLocaleDateString('en-US',{month:'long',year:'numeric'})}
-Return only real events with actual dates, names, and locations.`,
-      2000
-    );
-    let d;
-    try { d=parseJSON(raw); } catch(e){
-      document.getElementById('body-events').innerHTML=
-        `<div class="item-body" style="color:var(--muted);font-size:13px">${raw.slice(0,600)}</div>`+sourcesBar();
-      return;
-    }
-    const events=d.events||[];
-    let html='';
-    if(events.length===0){
-      html='<div class="item-body" style="color:var(--muted);padding:10px 0">No upcoming events found right now. Check the live sources below.</div>';
-    } else {
-      events.forEach(ev=>{
-        html+=`<div class="event-item">
-          <div class="event-date">📅 ${ev.date}</div>
-          <div class="event-name">${ev.url?`<a href="${ev.url}" target="_blank">${ev.name}</a>`:ev.name}</div>
-          <div class="event-detail">📍 ${ev.location}</div>
-          ${ev.detail?`<div class="event-detail" style="margin-top:2px">${ev.detail}</div>`:''}
-          <div class="item-meta">Source: ${ev.source}</div>
-        </div>`;
-      });
-    }
-    html+=sourcesBar();
-    document.getElementById('body-events').innerHTML=html;
-  } catch(e){
-    setError('body-events',e.message);
-    document.getElementById('body-events').innerHTML+=sourcesBar();
-  }
-}
-
 function sourcesBar(){
   return `<div class="sources-bar">🔗 Check live:
     <a href="https://www.addisonindependent.com" target="_blank">Addison Independent</a> ·
     <a href="https://www.921wvtk.com" target="_blank">921wvtk.com</a> ·
     <a href="https://frontporchforum.com/middlebury/calendar?area_id=middlebury&neighbor_areas=true" target="_blank">Front Porch Forum</a>
   </div>`;
+}
+
+async function loadEvents(){
+  setLoading('body-events');
+  const eventKeywords=['concert','festival','fair','market','farmers','exhibit','exhibition',
+    'performance','show','workshop','class','lecture','talk','reading','meetup','meeting',
+    'fundraiser','gala','auction','bingo','trivia','open mic','open house','tour','walk',
+    'run','race','game','play','musical','film','screening','sale','craft','art','gallery',
+    'volunteer','benefit','dance','parade','celebration','ceremony','awards','annual'];
+
+  function isEvent(title,desc){
+    const combined=(title+' '+desc).toLowerCase();
+    return eventKeywords.some(k=>combined.includes(k));
+  }
+
+  const sources=[
+    {url:'https://www.addisonindependent.com/feed',name:'Addison Independent'},
+    {url:'https://www.921wvtk.com/feed/',name:'921 WVTK'},
+    {url:'https://vtdigger.org/feed/',name:'VT Digger'},
+  ];
+
+  let allItems=[];
+  for(const src of sources){
+    try {
+      const xml=await fetchRSS(src.url);
+      Array.from(xml.querySelectorAll('item')).forEach(item=>{
+        const title=strip(item.querySelector('title')?.textContent||'');
+        const link=item.querySelector('link')?.textContent?.trim()||item.querySelector('guid')?.textContent?.trim()||'';
+        const pubDate=fmt(item.querySelector('pubDate')?.textContent||'');
+        const desc=strip(item.querySelector('description')?.textContent||'');
+        if(title) allItems.push({title,link,pubDate,desc,source:src.name});
+      });
+    } catch(e){ /* skip failed source */ }
+  }
+
+  const events=allItems.filter(i=>isEvent(i.title,i.desc));
+  const displayItems=events.length>=3?events:allItems;
+
+  let html='';
+  if(displayItems.length===0){
+    html='<div class="item-body" style="color:var(--muted)">No items found. Check the live sources below.</div>';
+  } else {
+    displayItems.slice(0,10).forEach(item=>{
+      html+=`<div class="event-item">
+        <div class="event-date">📅 ${item.pubDate} · <span style="color:var(--muted)">${item.source}</span></div>
+        <div class="event-name">${item.link?`<a href="${item.link}" target="_blank">${item.title}</a>`:item.title}</div>
+        ${item.desc?`<div class="event-detail">${item.desc.slice(0,120)}${item.desc.length>120?'…':''}</div>`:''}
+      </div>`;
+    });
+  }
+  html+=sourcesBar();
+  document.getElementById('body-events').innerHTML=html;
 }
 
 /* ══════════════════════════════════════════
@@ -764,42 +654,18 @@ async function loadNews(){
 
     if(items.length===0) throw new Error('No news items loaded');
 
-    // Show raw headlines immediately
-    function renderNews(headlines){
-      let html='';
-      headlines.forEach((h,i)=>{
-        html+=`<div class="headline-row">
-          <div class="headline-num">${String(i+1).padStart(2,'0')}</div>
-          <div>
-            <div class="item-label">${h.source} · ${h.date}</div>
-            <div class="headline-text">${h.link?`<a href="${h.link}" target="_blank">${h.title}</a>`:h.title}</div>
-            ${h.tease?`<div class="item-body" style="margin-top:3px;color:var(--gold)">${h.tease}</div>`:''}
-          </div>
-        </div>`;
-      });
-      return html;
-    }
-
-    document.getElementById('body-news').innerHTML=
-      renderNews(items)+'<div class="source-credit">NPR · VT Digger · Adding radio teases…</div>';
-
-    // Ask Claude to write a punchy on-air tease for each
-    try {
-      const raw=await askClaude(
-        `You are a morning drive radio writer for 92.1 WVTK in Middlebury Vermont — classic hits, friendly, local feel.
-Write a short punchy on-air tease for each headline. Return ONLY valid JSON — no markdown, no backticks.
-Schema: { "teases": [ { "title": string, "tease": string } ] }
-tease = 1 sentence, conversational, 15-25 words, written to be SPOKEN on air. No jargon. Make it sound like a real DJ.`,
-        `Write radio teases for these headlines:
-${items.map((h,i)=>`${i+1}. ${h.title}`).join('\n')}`
-      );
-      const d=parseJSON(raw);
-      const teaseMap={};
-      (d.teases||[]).forEach(t=>{ teaseMap[t.title]=t.tease; });
-      const enhanced=items.map(h=>({...h,tease:teaseMap[h.title]||''}));
-      document.getElementById('body-news').innerHTML=
-        renderNews(enhanced)+'<div class="source-credit">Sources: NPR · VT Digger · Teases by Claude</div>';
-    } catch(e){ /* keep raw */ }
+    let html='';
+    items.forEach((h,i)=>{
+      html+=`<div class="headline-row">
+        <div class="headline-num">${String(i+1).padStart(2,'0')}</div>
+        <div>
+          <div class="item-label">${h.source} · ${h.date}</div>
+          <div class="headline-text">${h.link?`<a href="${h.link}" target="_blank">${h.title}</a>`:h.title}</div>
+        </div>
+      </div>`;
+    });
+    html+='<div class="source-credit">Sources: NPR News · VT Digger</div>';
+    document.getElementById('body-news').innerHTML=html;
   } catch(e){ setError('body-news',e.message); }
 }
 
