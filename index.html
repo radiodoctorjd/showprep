@@ -422,6 +422,9 @@ async function loadHistory(){
       if(!used.has(e.text)){ picks.push(e); used.add(e.text); }
     }
 
+    // Sort final picks oldest to most recent
+    picks.sort((a,b)=>a.year-b.year);
+
     let html=`<div style="font-family:'Courier Prime',monospace;font-size:11px;color:var(--muted);margin-bottom:10px;letter-spacing:1px;text-transform:uppercase">
       ${TODAY.toLocaleDateString('en-US',{month:'long',day:'numeric'})} in History</div>`;
     picks.slice(0,7).forEach(ev=>{
@@ -670,39 +673,85 @@ async function loadNews(){
 }
 
 /* ══════════════════════════════════════════
-   TRENDING — Google Trends RSS
+   TRENDING — Reddit r/popular + r/news via JSON API
+   (No CORS issues — Reddit allows direct browser access)
 ══════════════════════════════════════════ */
 async function loadTrending(){
   setLoading('body-trending');
   try {
-    const xml=await fetchRSS('https://trends.google.com/trends/trendingsearches/daily/rss?geo=US');
-    const items=Array.from(xml.querySelectorAll('item')).slice(0,15);
+    // Reddit's JSON API works directly in the browser without CORS issues
+    const [popRes, newsRes, entRes] = await Promise.allSettled([
+      fetch('https://www.reddit.com/r/popular/hot.json?limit=8&raw_json=1', {headers:{'Accept':'application/json'}}),
+      fetch('https://www.reddit.com/r/news/hot.json?limit=5&raw_json=1',    {headers:{'Accept':'application/json'}}),
+      fetch('https://www.reddit.com/r/entertainment/hot.json?limit=5&raw_json=1', {headers:{'Accept':'application/json'}})
+    ]);
 
-    if(items.length===0) throw new Error('No trending items found');
+    const allTopics=[];
 
+    if(popRes.status==='fulfilled'&&popRes.value.ok){
+      const d=await popRes.value.json();
+      (d.data?.children||[]).forEach(c=>{
+        const p=c.data;
+        if(p.title&&!p.stickied) allTopics.push({
+          title:p.title, sub:'r/'+p.subreddit,
+          score:p.score, comments:p.num_comments,
+          url:'https://reddit.com'+p.permalink,
+          category:'TRENDING'
+        });
+      });
+    }
+
+    if(newsRes.status==='fulfilled'&&newsRes.value.ok){
+      const d=await newsRes.value.json();
+      (d.data?.children||[]).forEach(c=>{
+        const p=c.data;
+        if(p.title&&!p.stickied) allTopics.push({
+          title:p.title, sub:'r/news',
+          score:p.score, comments:p.num_comments,
+          url:'https://reddit.com'+p.permalink,
+          category:'NEWS'
+        });
+      });
+    }
+
+    if(entRes.status==='fulfilled'&&entRes.value.ok){
+      const d=await entRes.value.json();
+      (d.data?.children||[]).forEach(c=>{
+        const p=c.data;
+        if(p.title&&!p.stickied) allTopics.push({
+          title:p.title, sub:'r/entertainment',
+          score:p.score, comments:p.num_comments,
+          url:'https://reddit.com'+p.permalink,
+          category:'POP CULTURE'
+        });
+      });
+    }
+
+    if(allTopics.length===0) throw new Error('No trending data available');
+
+    // Sort by score, dedupe by similar titles
+    const sorted=allTopics.sort((a,b)=>b.score-a.score).slice(0,12);
+
+    // Tag cloud of topics
     let html='<div class="tag-cloud" style="margin-bottom:14px">';
-    items.forEach(item=>{
-      const title=strip(item.querySelector('title')?.textContent||'');
-      const link=item.querySelector('link')?.textContent?.trim()||'';
-      if(title) html+=`<span class="tag">${link?`<a href="https://trends.google.com/trends/explore?q=${encodeURIComponent(title)}&geo=US" target="_blank" style="color:var(--gold);text-decoration:none">${title}</a>`:title}</span>`;
+    sorted.slice(0,10).forEach(t=>{
+      // Extract a short keyword from the title
+      const keyword=t.title.split(/[,:.!?—–]/)[0].trim().slice(0,40);
+      html+=`<span class="tag"><a href="${t.url}" target="_blank" style="color:var(--gold);text-decoration:none">${keyword}</a></span>`;
     });
     html+='</div>';
 
-    // Also show top 5 with traffic info
-    items.slice(0,5).forEach(item=>{
-      const title=strip(item.querySelector('title')?.textContent||'');
-      const traffic=item.querySelector('approx_traffic')?.textContent||
-                    item.getElementsByTagNameNS('*','approx_traffic')[0]?.textContent||'';
-      const news=Array.from(item.querySelectorAll('news_item_title,item')).slice(0,1)
-        .map(n=>strip(n.textContent)).filter(Boolean)[0]||'';
+    // Top items with detail
+    sorted.slice(0,8).forEach(t=>{
+      const upvotes=t.score>=1000?(t.score/1000).toFixed(1)+'k':t.score;
       html+=`<div class="item">
-        <div class="item-label">🔥 ${title}</div>
-        ${traffic?`<div class="item-body">${traffic} searches</div>`:''}
-        ${news?`<div class="item-body" style="color:var(--text)">${news}</div>`:''}
+        <div class="item-label">🔥 ${t.category} · ${t.sub}</div>
+        <div class="item-title"><a href="${t.url}" target="_blank">${t.title}</a></div>
+        <div class="item-meta">▲ ${upvotes} upvotes · 💬 ${t.comments} comments</div>
       </div>`;
     });
 
-    html+='<div class="source-credit">Source: Google Trends (US)</div>';
+    html+='<div class="source-credit">Source: Reddit r/popular · r/news · r/entertainment</div>';
     document.getElementById('body-trending').innerHTML=html;
   } catch(e){ setError('body-trending',e.message); }
 }
