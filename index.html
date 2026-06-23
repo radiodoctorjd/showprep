@@ -677,69 +677,54 @@ async function loadNews(){
 }
 
 /* ══════════════════════════════════════════
-   TRENDING — Hacker News API (top stories with top comments)
+   TRENDING — E! Online + People + Entertainment Tonight RSS
+   Pop culture & celebrity news, perfect for radio show prep
 ══════════════════════════════════════════ */
 async function loadTrending(){
   setLoading('body-trending');
   try {
-    // Fetch top story IDs
-    const idsRes=await fetch('https://hacker-news.firebaseio.com/v0/topstories.json');
-    if(!idsRes.ok) throw new Error('HN API failed: '+idsRes.status);
-    const ids=await idsRes.json();
+    const sources=[
+      {url:'https://www.eonline.com/syndication/feeds/rssfeeds/topstories.xml', name:'E! Online', cat:'POP CULTURE'},
+      {url:'https://people.com/feed/',                                           name:'People',   cat:'CELEBRITY'},
+      {url:'https://www.etonline.com/news/rss',                                 name:'ET Online', cat:'ENTERTAINMENT'},
+      {url:'https://www.usmagazine.com/feed/',                                  name:'Us Weekly', cat:'CELEBRITY'},
+    ];
 
-    // Fetch top 10 stories in parallel
-    const stories=await Promise.all(
-      ids.slice(0,10).map(id=>
-        fetch(`https://hacker-news.firebaseio.com/v0/item/${id}.json`).then(r=>r.json())
-      )
-    );
+    const allItems=[];
+    const results=await Promise.allSettled(sources.map(s=>fetchRSS(s.url).then(xml=>({xml,src:s}))));
 
-    const valid=stories.filter(s=>s&&s.title&&s.type==='story');
-    if(valid.length===0) throw new Error('No stories returned');
+    results.forEach(r=>{
+      if(r.status!=='fulfilled') return;
+      const {xml,src}=r.value;
+      Array.from(xml.querySelectorAll('item')).slice(0,6).forEach(item=>{
+        const title=strip(item.querySelector('title')?.textContent||'');
+        const link=(item.querySelector('link')?.textContent||item.querySelector('guid')?.textContent||'').trim();
+        const pubDate=fmt(item.querySelector('pubDate')?.textContent||'');
+        const desc=strip(item.querySelector('description')?.textContent||'').slice(0,140);
+        if(title) allItems.push({title,link,pubDate,desc,source:src.name,cat:src.cat});
+      });
+    });
 
-    // For each story, fetch top 2 comments to give context
-    async function getTopComments(story){
-      if(!story.kids||story.kids.length===0) return [];
-      const commentIds=story.kids.slice(0,5);
-      const comments=await Promise.all(
-        commentIds.map(id=>
-          fetch(`https://hacker-news.firebaseio.com/v0/item/${id}.json`).then(r=>r.json()).catch(()=>null)
-        )
-      );
-      return comments
-        .filter(c=>c&&c.text&&!c.dead&&!c.deleted)
-        .map(c=>({
-          text:c.text.replace(/<[^>]+>/g,' ').replace(/&#x27;/g,"'").replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/&#x2F;/g,'/').replace(/\s+/g,' ').trim().slice(0,160),
-          by:c.by||'anonymous'
-        }))
-        .slice(0,2);
-    }
+    if(allItems.length===0) throw new Error('No trending items loaded — proxies may be blocked');
 
-    // Fetch comments for all stories in parallel
-    const commentSets=await Promise.all(valid.map(s=>getTopComments(s)));
+    // Dedupe by similar title, keep freshest
+    const seen=new Set();
+    const deduped=allItems.filter(i=>{
+      const key=i.title.slice(0,30).toLowerCase();
+      if(seen.has(key)) return false;
+      seen.add(key); return true;
+    });
 
     let html='';
-    valid.forEach((s,i)=>{
-      const discussUrl=`https://news.ycombinator.com/item?id=${s.id}`;
-      const articleUrl=s.url||discussUrl;
-      const score=s.score||0;
-      const comments=s.descendants||0;
-      const domain=s.url?new URL(s.url).hostname.replace('www.',''):'news.ycombinator.com';
-      const topComments=commentSets[i]||[];
-
+    deduped.slice(0,12).forEach(t=>{
       html+=`<div class="item">
-        <div class="item-label">🔥 #${i+1} · ${domain}</div>
-        <div class="item-title"><a href="${articleUrl}" target="_blank">${s.title}</a></div>
-        <div class="item-meta" style="margin:3px 0 6px">▲ ${score} points · 💬 <a href="${discussUrl}" target="_blank" style="color:var(--muted)">${comments} comments</a></div>
-        ${topComments.map(c=>`
-          <div style="border-left:2px solid var(--border);padding:4px 0 4px 10px;margin-bottom:4px">
-            <div style="font-size:11px;color:var(--gold);margin-bottom:2px">${c.by}</div>
-            <div style="font-size:12px;color:var(--muted);line-height:1.45">${c.text}${c.text.length>=160?'…':''}</div>
-          </div>`).join('')}
+        <div class="item-label">🔥 ${t.cat} · ${t.source} · ${t.pubDate}</div>
+        <div class="item-title">${t.link?`<a href="${t.link}" target="_blank">${t.title}</a>`:t.title}</div>
+        ${t.desc?`<div class="item-body">${t.desc}${t.desc.length>=140?'…':''}</div>`:''}
       </div>`;
     });
 
-    html+='<div class="source-credit">Source: Hacker News — news.ycombinator.com</div>';
+    html+='<div class="source-credit">Sources: E! Online · People · ET Online · Us Weekly</div>';
     document.getElementById('body-trending').innerHTML=html;
   } catch(e){ setError('body-trending',e.message); }
 }
