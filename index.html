@@ -33,9 +33,9 @@
     .card-title{font-family:'Oswald',sans-serif;font-size:14px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);display:flex;align-items:center;gap:8px}
     .refresh-btn{background:none;border:1px solid var(--border);border-radius:4px;color:var(--muted);font-size:13px;padding:3px 8px;cursor:pointer;transition:color .15s,border-color .15s}
     .refresh-btn:hover{color:var(--gold);border-color:var(--gold)}
-    .card-body{padding:14px 16px;flex:1;overflow-y:auto;max-height:440px}
-    .card-body::-webkit-scrollbar{width:5px}
-    .card-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+    .card-body{padding:14px 16px;flex:1}
+    
+    
 
     .loading-state{display:flex;align-items:center;gap:10px;color:var(--muted);font-family:'Courier Prime',monospace;font-size:13px;padding:12px 0}
     .spinner{width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--gold);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
@@ -637,7 +637,7 @@ async function loadNews(){
   setLoading('body-news');
   try {
     const [wcaxRes,vtRes]=await Promise.allSettled([
-      fetchRSS('https://www.wcax.com/rss/'),
+      fetchRSS('https://www.wcax.com/arc/outboundfeeds/whiz-rss/category/news/?outputType=xml&sort=display_date:desc&size=50'),
       fetchRSS('https://vtdigger.org/feed/')
     ]);
 
