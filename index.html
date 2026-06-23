@@ -201,10 +201,6 @@ setInterval(updateClock,1000); updateClock();
 
 /* ── DATE HELPERS ── */
 const TODAY=new Date();
-function dayName(offset){
-  const d=new Date(TODAY); d.setDate(d.getDate()+offset);
-  return offset===0?'Today':offset===1?'Tomorrow':d.toLocaleDateString('en-US',{weekday:'short'});
-}
 function shortDate(offset){
   const d=new Date(TODAY); d.setDate(d.getDate()+offset);
   return d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
@@ -226,18 +222,55 @@ function wmoLabel(code){
   return {emoji:e.slice(0,i),desc:e.slice(i+1)};
 }
 
-/* ── CORS PROXY for RSS ── */
-function proxied(url){
-  return 'https://api.allorigins.win/get?url='+encodeURIComponent(url);
-}
-
-/* ── FETCH RSS via proxy ── */
+/* ── FETCH RSS — tries multiple CORS proxies in order ── */
 async function fetchRSS(url){
-  const res=await fetch(proxied(url));
-  if(!res.ok) throw new Error('Proxy fetch failed: '+res.status);
-  const data=await res.json();
-  const parser=new DOMParser();
-  return parser.parseFromString(data.contents,'text/xml');
+  const proxies=[
+    // rss2json returns JSON directly — handled separately
+    async (u)=>{
+      const r=await fetch('https://api.rss2json.com/v1/api.json?rss_url='+encodeURIComponent(u));
+      if(!r.ok) throw new Error('rss2json '+r.status);
+      const j=await r.json();
+      if(j.status!=='ok') throw new Error('rss2json: '+j.message);
+      // Convert rss2json format to a fake XML-like object with querySelectorAll
+      return {_rss2json: j, querySelectorAll:(sel)=>{
+        if(sel==='item') return j.items.map(item=>({
+          _item:item,
+          querySelector:(s)=>{
+            const map={
+              title:{textContent:item.title||''},
+              link:{textContent:item.link||''},
+              guid:{textContent:item.guid||item.link||''},
+              pubDate:{textContent:item.pubDate||''},
+              description:{textContent:item.description||item.content||''},
+            };
+            return map[s]||null;
+          },
+          querySelectorAll:()=>[],
+          getElementsByTagNameNS:()=>[]
+        }));
+        return [];
+      }};
+    },
+    // corsproxy.io — returns raw XML
+    async (u)=>{
+      const r=await fetch('https://corsproxy.io/?'+encodeURIComponent(u));
+      if(!r.ok) throw new Error('corsproxy '+r.status);
+      const text=await r.text();
+      return new DOMParser().parseFromString(text,'text/xml');
+    },
+    // allorigins — returns JSON with contents string
+    async (u)=>{
+      const r=await fetch('https://api.allorigins.win/get?url='+encodeURIComponent(u));
+      if(!r.ok) throw new Error('allorigins '+r.status);
+      const j=await r.json();
+      return new DOMParser().parseFromString(j.contents,'text/xml');
+    }
+  ];
+  let lastErr;
+  for(const proxy of proxies){
+    try{ return await proxy(url); } catch(e){ lastErr=e; }
+  }
+  throw new Error('All RSS proxies failed: '+lastErr.message);
 }
 
 /* ── UI HELPERS ── */
@@ -284,20 +317,54 @@ async function loadWeather(){
       }
     }
 
+    // Also fetch hourly data to get tonight's temp
+    const hourlyUrl='https://api.open-meteo.com/v1/forecast?latitude=44.0153&longitude=-73.1673'
+      +'&hourly=temperature_2m,weathercode&temperature_unit=fahrenheit&timezone=America%2FNew_York&forecast_days=2';
+    let tonightTemp=null, tonightCode=null;
+    try {
+      const hRes=await fetch(hourlyUrl);
+      const hData=await hRes.json();
+      const hours=hData.hourly.time;
+      // Find hours 20-23 (8pm-11pm) today for "tonight"
+      const todayStr=TODAY.toISOString().slice(0,10);
+      const tonightHours=hours.reduce((acc,t,i)=>{
+        if(t.startsWith(todayStr)){
+          const hr=parseInt(t.slice(11,13));
+          if(hr>=20&&hr<=23) acc.push(i);
+        }
+        return acc;
+      },[]);
+      if(tonightHours.length){
+        const temps=tonightHours.map(i=>hData.hourly.temperature_2m[i]);
+        tonightTemp=Math.round(Math.min(...temps));
+        tonightCode=hData.hourly.weathercode[tonightHours[0]];
+      }
+    } catch(e){ /* tonight optional */ }
+
+    // Slots: Today, Tonight, Tomorrow, Day+2, Day+3
+    const slots=[
+      { label:'Today',    sub:shortDate(0), hi:Math.round(d.temperature_2m_max[0]), lo:Math.round(d.temperature_2m_min[0]), code:d.weathercode[0], precip:d.precipitation_probability_max[0], isTonight:false },
+      { label:'Tonight',  sub:'overnight',  hi:null, lo:tonightTemp!==null?tonightTemp:Math.round(d.temperature_2m_min[0]), code:tonightCode!==null?tonightCode:d.weathercode[0], precip:d.precipitation_probability_max[0], isTonight:true },
+      { label:'Tomorrow', sub:shortDate(1), hi:Math.round(d.temperature_2m_max[1]), lo:Math.round(d.temperature_2m_min[1]), code:d.weathercode[1], precip:d.precipitation_probability_max[1], isTonight:false },
+      { label:shortDate(2).split(' ')[0]+' '+shortDate(2).split(' ')[1], sub:shortDate(2), hi:Math.round(d.temperature_2m_max[2]), lo:Math.round(d.temperature_2m_min[2]), code:d.weathercode[2], precip:d.precipitation_probability_max[2], isTonight:false },
+      { label:shortDate(3).split(' ')[0]+' '+shortDate(3).split(' ')[1], sub:shortDate(3), hi:Math.round(d.temperature_2m_max[3]), lo:Math.round(d.temperature_2m_min[3]), code:d.weathercode[3], precip:d.precipitation_probability_max[3], isTonight:false },
+    ];
+
     let html=alertHTML+'<div class="weather-grid">';
-    for(let i=0;i<5;i++){
-      const {emoji,desc}=wmoLabel(d.weathercode[i]);
-      const precip=d.precipitation_probability_max[i];
+    slots.forEach(s=>{
+      const {emoji,desc}=wmoLabel(s.code);
       html+=`<div class="weather-day">
-        <div class="day-name">${dayName(i)}</div>
-        <div class="date-sub">${shortDate(i)}</div>
+        <div class="day-name">${s.label}</div>
+        <div class="date-sub">${s.sub}</div>
         <div class="emoji">${emoji}</div>
-        <div class="hi">${Math.round(d.temperature_2m_max[i])}°</div>
-        <div class="lo">/ ${Math.round(d.temperature_2m_min[i])}°F</div>
+        ${s.isTonight
+          ? `<div class="lo" style="font-size:22px;color:#fff">${s.lo}°F</div>`
+          : `<div class="hi">${s.hi}°</div><div class="lo">/ ${s.lo}°F</div>`
+        }
         <div class="desc">${desc}</div>
-        ${precip!=null?`<div class="precip">💧 ${precip}%</div>`:''}
+        ${s.precip!=null?`<div class="precip">💧 ${s.precip}%</div>`:''}
       </div>`;
-    }
+    });
     html+='</div><div class="source-credit">Open-Meteo.com · NWS Alerts · Middlebury VT (44.02°N 73.17°W)</div>';
     document.getElementById('body-weather').innerHTML=html;
   } catch(e){ setError('body-weather',e.message); }
@@ -316,17 +383,42 @@ async function loadHistory(){
     const data=await res.json();
     const events=data.events||[];
 
-    // Pick a spread across eras
+    const histBoost=['united states','american','president','nasa','music','rock','pop','film','movie',
+      'television','hollywood','nfl','nba','mlb','grammy','oscar','emmy','broadway','invented','discovery',
+      'apollo','space','world war','civil war','independence','constitution','congress','supreme court',
+      'martin luther king','assassination','moon','atomic','internet','record','chart','billboard',
+      'beatles','elvis','woodstock','vietnam','cold war'];
+    const histPenalty=['cricket','formula one','prime minister of','president of france','german','french parliament',
+      'soviet','bundesliga','premier league','rugby','serie a','la liga'];
+
+    function scoreHistEvent(ev){
+      const txt=(ev.text||'').toLowerCase();
+      let score=0;
+      histBoost.forEach(t=>{ if(txt.includes(t)) score+=60; });
+      histPenalty.forEach(t=>{ if(txt.includes(t)) score-=80; });
+      // Slightly favor more recent (more recognizable)
+      if(ev.year>=1950) score+=20;
+      if(ev.year>=1970) score+=20;
+      return score;
+    }
+
+    // Score and sort, then pick a spread across eras
+    const scoredEvents=events.map(e=>({...e,_score:scoreHistEvent(e)}))
+      .sort((a,b)=>b._score-a._score);
+
+    // Take top scorer from each era bucket, then fill remainder from top scorers overall
     const buckets=[[1800,1900],[1900,1945],[1945,1970],[1970,1990],[1990,2010],[2010,2100]];
     const picks=[];
+    const used=new Set();
     for(const [lo,hi] of buckets){
-      const c=events.filter(e=>e.year>=lo&&e.year<hi);
-      if(c.length) picks.push(c[Math.floor(Math.random()*Math.min(c.length,3))]);
+      const c=scoredEvents.filter(e=>e.year>=lo&&e.year<hi&&!used.has(e.text));
+      if(c.length){ picks.push(c[0]); used.add(c[0].text); }
       if(picks.length>=7) break;
     }
-    while(picks.length<6&&events.length){
-      const e=events[Math.floor(Math.random()*events.length)];
-      if(!picks.includes(e)) picks.push(e);
+    // Fill to 7 from top overall
+    for(const e of scoredEvents){
+      if(picks.length>=7) break;
+      if(!used.has(e.text)){ picks.push(e); used.add(e.text); }
     }
 
     let html=`<div style="font-family:'Courier Prime',monospace;font-size:11px;color:var(--muted);margin-bottom:10px;letter-spacing:1px;text-transform:uppercase">
@@ -357,29 +449,71 @@ async function loadBirthdays(){
     const data=await res.json();
     const yr=TODAY.getFullYear();
 
-    const notable=(data.births||[])
+    // Keywords that suggest US/globally famous people relevant to a classic hits radio audience
+    const usTerms=[
+      'american','actor','actress','singer','musician','rapper','comedian','director',
+      'nfl','nba','mlb','nhl','baseball','basketball','football','tennis',
+      'rock','pop','country','jazz','blues','soul','r&b','hip hop',
+      'politician','senator','president','governor','author','novelist',
+      'television','film','movie','hollywood','broadway','grammy','oscar','emmy',
+      'hall of fame','superstar','legend','iconic'
+    ];
+    // Keywords that suggest non-US/less relevant figures — deprioritize unless description is very long (very famous)
+    const foreignOnlyTerms=[
+      'french politician','german politician','british politician','italian politician',
+      'spanish footballer','footballer','cricketer','rugby','formula one',
+      'prime minister of','president of','king of','queen of','prince of','duke of'
+    ];
+
+    const allScored=(data.births||[])
       .filter(b=>b.pages&&b.pages.length&&b.pages[0].description)
       .map(b=>{
         const p=b.pages[0];
+        const desc=(p.description||'').toLowerCase();
+        const age=yr-b.year;
+        if(age<=0||age>115) return null;
+        let score=desc.length;
+        usTerms.forEach(t=>{ if(desc.includes(t)) score+=80; });
+        foreignOnlyTerms.forEach(t=>{ if(desc.includes(t)) score-=120; });
+        // Detect if person has passed away — Wikipedia descriptions often say "was a" (past tense)
+        // or the pages array may include a death year
+        const rawDesc=p.description||'';
+        const deceased=rawDesc.toLowerCase().startsWith('was ')||
+                       (b.pages[0].deaths&&b.pages[0].deaths.length>0)||
+                       rawDesc.match(/\(.*\d{4}.*–.*\d{4}.*\)/)||
+                       false;
         return {
-          year:b.year, age:yr-b.year,
-          name:p.title, desc:p.description||'',
-          url:p.content_urls&&p.content_urls.desktop?p.content_urls.desktop.page:null,
-          descLen:(p.description||'').length
+          year:b.year, age, score, deceased,
+          name:p.title, desc:rawDesc,
+          url:p.content_urls&&p.content_urls.desktop?p.content_urls.desktop.page:null
         };
       })
-      .filter(b=>b.age>0&&b.age<115)
-      .sort((a,b)=>b.descLen-a.descLen)
-      .slice(0,10);
+      .filter(Boolean)
+      .sort((a,b)=>b.score-a.score)
+      .slice(0,20); // grab more so we have enough after splitting
+
+    // Split into living and deceased, each sorted oldest→youngest
+    const living=allScored.filter(b=>!b.deceased).sort((a,b)=>a.year-b.year).slice(0,8);
+    const deceased=allScored.filter(b=>b.deceased).sort((a,b)=>a.year-b.year).slice(0,5);
+    const notable=[...living,...deceased];
 
     let html='<div class="birthday-list">';
+    let shownDeceased=false;
     notable.forEach(b=>{
-      html+=`<div class="birthday-row">
-        <div class="birthday-age">${b.age}</div>
+      const cleanName=b.name.replace(/_/g,' ');
+      // Insert divider before first deceased entry
+      if(b.deceased&&!shownDeceased){
+        shownDeceased=true;
+        html+=`<div style="font-family:'Courier Prime',monospace;font-size:10px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;padding:8px 0 4px;border-top:1px solid var(--border);margin-top:4px">In Memoriam</div>`;
+      }
+      html+=`<div class="birthday-row" style="${b.deceased?'opacity:0.75':''}">
+        <div class="birthday-age" style="${b.deceased?'color:var(--muted)':''}">
+          ${b.deceased?'✝':'🎂'}<br/><span style="font-size:13px">${b.age}</span>
+        </div>
         <div>
-          <div class="birthday-name">🎂 ${b.url?`<a href="${b.url}" target="_blank">${b.name}</a>`:b.name}</div>
-          <div class="birthday-note">${b.desc}</div>
-          <div class="item-meta">Born ${b.year}</div>
+          <div class="birthday-name">${b.url?`<a href="${b.url}" target="_blank">${cleanName}</a>`:cleanName}</div>
+          <div class="birthday-note" style="color:var(--gold);font-size:12px">${b.desc}</div>
+          <div class="item-meta">Born ${b.year}${b.deceased?' · Passed away':' · Turns '+b.age+' today'}</div>
         </div>
       </div>`;
     });
@@ -389,39 +523,71 @@ async function loadBirthdays(){
 }
 
 /* ══════════════════════════════════════════
-   COMMUNITY EVENTS — Addison Independent RSS
-   + Front Porch Forum & WVTK links
+   COMMUNITY EVENTS — multiple sources, filter for actual events
 ══════════════════════════════════════════ */
 async function loadEvents(){
   setLoading('body-events');
-  try {
-    const xml=await fetchRSS('https://www.addisonindependent.com/feed');
-    const items=Array.from(xml.querySelectorAll('item')).slice(0,12);
 
-    let html='';
-    if(items.length===0){
-      html='<div class="item-body">No items found in feed.</div>';
-    } else {
+  // Keywords that suggest a real community event
+  const eventKeywords=['concert','festival','fair','market','farmers','exhibit','exhibition',
+    'performance','show','workshop','class','lecture','talk','reading','meetup','meeting',
+    'fundraiser','gala','auction','bingo','trivia','open mic','open house','tour','walk',
+    'run','race','game','play','musical','film','screening','registration','deadline',
+    'sale','craft','art','gallery','volunteer','benefit','dance','parade','celebration',
+    'ceremony','awards','graduation','trunk','trick','treat','halloween','thanksgiving',
+    'christmas','holiday','winter','spring','summer','fall','season','annual'];
+
+  function isEvent(title, desc){
+    const combined=(title+' '+desc).toLowerCase();
+    return eventKeywords.some(k=>combined.includes(k));
+  }
+
+  // Try multiple RSS sources that may have event listings
+  const sources=[
+    { url:'https://www.addisonindependent.com/feed', name:'Addison Independent' },
+    { url:'https://www.921wvtk.com/feed/', name:'921 WVTK' },
+    { url:'https://vtdigger.org/feed/', name:'VT Digger' },
+  ];
+
+  let allItems=[];
+  for(const src of sources){
+    try {
+      const xml=await fetchRSS(src.url);
+      const items=Array.from(xml.querySelectorAll('item'));
       items.forEach(item=>{
         const title=strip(item.querySelector('title')?.textContent||'');
-        const link=item.querySelector('link')?.textContent?.trim()||
-                   item.querySelector('guid')?.textContent?.trim()||'';
+        const link=item.querySelector('link')?.textContent?.trim()||item.querySelector('guid')?.textContent?.trim()||'';
         const pubDate=fmt(item.querySelector('pubDate')?.textContent||'');
-        const desc=strip(item.querySelector('description')?.textContent||'').slice(0,120);
-        html+=`<div class="event-item">
-          <div class="event-date">📅 ${pubDate}</div>
-          <div class="event-name">${link?`<a href="${link}" target="_blank">${title}</a>`:title}</div>
-          ${desc?`<div class="event-detail">${desc}${desc.length>=120?'…':''}</div>`:''}
-        </div>`;
+        const desc=strip(item.querySelector('description')?.textContent||'');
+        if(title) allItems.push({title,link,pubDate,desc,source:src.name});
       });
-    }
-    html+=`<div class="sources-bar">🔗 Live sources:
-      <a href="https://www.addisonindependent.com" target="_blank">Addison Independent</a> ·
-      <a href="https://www.921wvtk.com" target="_blank">921wvtk.com</a> ·
-      <a href="https://frontporchforum.com/middlebury/calendar?area_id=middlebury&neighbor_areas=true" target="_blank">Front Porch Forum</a>
-    </div>`;
-    document.getElementById('body-events').innerHTML=html;
-  } catch(e){ setError('body-events',e.message+' — <a href="https://www.addisonindependent.com" target="_blank" style="color:var(--gold)">Visit Addison Independent</a>'); }
+    } catch(e){ /* skip failed source */ }
+  }
+
+  // Filter to items that look like events
+  const events=allItems.filter(i=>isEvent(i.title,i.desc));
+  const displayItems=events.length>=3 ? events : allItems; // fall back to all if not enough events found
+  const label=events.length>=3 ? 'event' : 'story';
+
+  let html='';
+  if(displayItems.length===0){
+    html='<div class="item-body" style="color:var(--muted)">No items found. Check the live sources below.</div>';
+  } else {
+    displayItems.slice(0,10).forEach(item=>{
+      html+=`<div class="event-item">
+        <div class="event-date">📅 ${item.pubDate} · <span style="color:var(--muted)">${item.source}</span></div>
+        <div class="event-name">${item.link?`<a href="${item.link}" target="_blank">${item.title}</a>`:item.title}</div>
+        ${item.desc?`<div class="event-detail">${item.desc.slice(0,120)}${item.desc.length>120?'…':''}</div>`:''}
+      </div>`;
+    });
+  }
+
+  html+=`<div class="sources-bar">🔗 Check live:
+    <a href="https://www.addisonindependent.com" target="_blank">Addison Independent</a> ·
+    <a href="https://www.921wvtk.com" target="_blank">921wvtk.com</a> ·
+    <a href="https://frontporchforum.com/middlebury/calendar?area_id=middlebury&neighbor_areas=true" target="_blank">Front Porch Forum</a>
+  </div>`;
+  document.getElementById('body-events').innerHTML=html;
 }
 
 /* ══════════════════════════════════════════
