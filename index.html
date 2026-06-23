@@ -604,28 +604,72 @@ async function loadEvents(){
 }
 
 /* ══════════════════════════════════════════
-   CLASSIC HITS & ROCK NEWS — Ultimate Classic Rock RSS
+   CLASSIC HITS & ROCK NEWS — RTTNews Classic Rock
+   Uses RTTNews Music RSS + filters for classic rock content
+   Also tries Ultimate Classic Rock as fallback
 ══════════════════════════════════════════ */
 async function loadMusicNews(){
   setLoading('body-musicnews');
   try {
-    const xml=await fetchRSS('https://ultimateclassicrock.com/feed/');
-    const items=Array.from(xml.querySelectorAll('item')).slice(0,8);
+    // RTTNews Music RSS — covers all genres, filter for classic/rock
+    const [rttRes, ucrRes] = await Promise.allSettled([
+      fetchRSS('https://www.rttnews.com/RSS/MusicNews.xml'),
+      fetchRSS('https://ultimateclassicrock.com/feed/')
+    ]);
+
+    const classicRockTerms=['classic rock','rock','band','guitar','album','tour','concert',
+      'rolling stones','beatles','led zeppelin','pink floyd','eagles','fleetwood mac',
+      'bruce springsteen','bon jovi','aerosmith','ac/dc','queen','u2','elton john',
+      'paul mccartney','mick jagger','pete townshend','roger daltrey','heart',
+      'journey','foreigner','boston','styx','REO','def leppard','van halen',
+      'david bowie','stevie nicks','tom petty','john lennon','paul simon',
+      'billy joel','brian may','single','reissue','anniversary','hall of fame',
+      'grammy','tribute','reunion','vinyl','classic','hits','70s','80s','legend'];
+
+    const allItems=[];
+
+    // RTTNews items — filter for classic rock relevance
+    if(rttRes.status==='fulfilled'){
+      Array.from(rttRes.value.querySelectorAll('item')).forEach(item=>{
+        const title=strip(item.querySelector('title')?.textContent||'');
+        const link=(item.querySelector('link')?.textContent||item.querySelector('guid')?.textContent||'').trim();
+        const pubDate=fmt(item.querySelector('pubDate')?.textContent||'');
+        const desc=strip(item.querySelector('description')?.textContent||'');
+        const combined=(title+' '+desc).toLowerCase();
+        const score=classicRockTerms.filter(t=>combined.includes(t)).length;
+        if(title && score>0) allItems.push({title,link,pubDate,desc:desc.slice(0,120),score,source:'RTTNews'});
+      });
+    }
+
+    // UCR items — always relevant
+    if(ucrRes.status==='fulfilled'){
+      Array.from(ucrRes.value.querySelectorAll('item')).slice(0,6).forEach(item=>{
+        const title=strip(item.querySelector('title')?.textContent||'');
+        const link=(item.querySelector('link')?.textContent||item.querySelector('guid')?.textContent||'').trim();
+        const pubDate=fmt(item.querySelector('pubDate')?.textContent||'');
+        const desc=strip(item.querySelector('description')?.textContent||'').slice(0,120);
+        if(title) allItems.push({title,link,pubDate,desc,score:5,source:'Ultimate Classic Rock'});
+      });
+    }
+
+    if(allItems.length===0) throw new Error('No music news loaded');
+
+    // Sort by score desc, dedupe
+    const seen=new Set();
+    const sorted=allItems
+      .sort((a,b)=>b.score-a.score)
+      .filter(i=>{ const k=i.title.slice(0,30).toLowerCase(); if(seen.has(k)) return false; seen.add(k); return true; })
+      .slice(0,12);
 
     let html='';
-    items.forEach(item=>{
-      const title=strip(item.querySelector('title')?.textContent||'');
-      const link=item.querySelector('link')?.textContent?.trim()||
-                 item.querySelector('guid')?.textContent?.trim()||'';
-      const pubDate=fmt(item.querySelector('pubDate')?.textContent||'');
-      const desc=strip(item.querySelector('description')?.textContent||'').slice(0,100);
+    sorted.forEach(item=>{
       html+=`<div class="item">
-        <div class="item-label">🎸 ${pubDate}</div>
-        <div class="item-title">${link?`<a href="${link}" target="_blank">${title}</a>`:title}</div>
-        ${desc?`<div class="item-body">${desc}${desc.length>=100?'…':''}</div>`:''}
+        <div class="item-label">🎸 ${item.source} · ${item.pubDate}</div>
+        <div class="item-title">${item.link?`<a href="${item.link}" target="_blank">${item.title}</a>`:item.title}</div>
+        ${item.desc?`<div class="item-body">${item.desc}${item.desc.length>=120?'…':''}</div>`:''}
       </div>`;
     });
-    html+='<div class="source-credit">Source: Ultimate Classic Rock (ultimateclassicrock.com)</div>';
+    html+='<div class="source-credit">Sources: <a href="https://www.rttnews.com/list/classic-rock-music.aspx" target="_blank" style="color:var(--gold)">RTTNews Classic Rock</a> · Ultimate Classic Rock</div>';
     document.getElementById('body-musicnews').innerHTML=html;
   } catch(e){ setError('body-musicnews',e.message); }
 }
