@@ -1,749 +1,590 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ShowPrep — Radio Show Prep Tool</title>
-<style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>92.1 WVTK — Show Prep Dashboard</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;600;700&family=Source+Sans+3:wght@400;600&family=Courier+Prime:wght@400;700&display=swap');
+    :root {
+      --red:#C8102E; --gold:#F5A800; --dark:#111316; --mid:#1C2028;
+      --panel:#232830; --border:#333A45; --text:#E8EAF0; --muted:#8A93A2;
+      --green:#3CBA6E; --on-air:#FF3B30;
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{background:var(--dark);color:var(--text);font-family:'Source Sans 3',sans-serif;font-size:15px;line-height:1.55;min-height:100vh}
 
-  :root {
-    --navy: #0d1b2a;
-    --navy-mid: #1a2d42;
-    --navy-light: #243850;
-    --amber: #f0a500;
-    --amber-dim: #c4841a;
-    --amber-pale: #fdf0d0;
-    --red-on: #e63946;
-    --white: #f7f9fc;
-    --text-muted: #8fa8c8;
-    --text-body: #d0dde8;
-    --card-bg: #162032;
-    --card-border: #243850;
-    --font: 'Segoe UI', system-ui, sans-serif;
-    --mono: 'Courier New', monospace;
-  }
+    header{background:var(--mid);border-bottom:3px solid var(--red);padding:0 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;min-height:64px}
+    .header-left{display:flex;align-items:center;gap:16px}
+    .on-air-dot{width:12px;height:12px;border-radius:50%;background:var(--on-air);box-shadow:0 0 8px var(--on-air);animation:pulse 1.4s ease-in-out infinite;flex-shrink:0}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+    .station-name{font-family:'Oswald',sans-serif;font-size:22px;font-weight:700;color:#fff}
+    .station-name span{color:var(--gold)}
+    .tagline{font-family:'Courier Prime',monospace;font-size:11px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase}
+    #clock{font-family:'Courier Prime',monospace;font-size:18px;color:var(--gold);letter-spacing:2px;white-space:nowrap}
+    #refresh-all-btn{background:var(--red);color:#fff;border:none;border-radius:6px;font-family:'Oswald',sans-serif;font-size:14px;font-weight:600;padding:8px 18px;cursor:pointer;transition:background .15s}
+    #refresh-all-btn:hover{background:#a50d24}
 
-  body {
-    background: var(--navy);
-    color: var(--text-body);
-    font-family: var(--font);
-    min-height: 100vh;
-  }
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px;padding:20px 24px;max-width:1600px;margin:0 auto}
+    .card.wide{grid-column:1/-1}
 
-  /* ── Header ── */
-  header {
-    background: var(--navy-mid);
-    border-bottom: 2px solid var(--amber);
-    padding: 0 2rem;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    height: 60px;
-  }
+    .card{background:var(--panel);border:1px solid var(--border);border-radius:10px;overflow:hidden;display:flex;flex-direction:column}
+    .card-header{background:var(--mid);border-bottom:2px solid var(--red);padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+    .card-title{font-family:'Oswald',sans-serif;font-size:14px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);display:flex;align-items:center;gap:8px}
+    .refresh-btn{background:none;border:1px solid var(--border);border-radius:4px;color:var(--muted);font-size:13px;padding:3px 8px;cursor:pointer;transition:color .15s,border-color .15s}
+    .refresh-btn:hover{color:var(--gold);border-color:var(--gold)}
+    .card-body{padding:14px 16px;flex:1;overflow-y:auto;max-height:440px}
+    .card-body::-webkit-scrollbar{width:5px}
+    .card-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 
-  .logo {
-    font-family: var(--mono);
-    font-size: 1.4rem;
-    font-weight: bold;
-    color: var(--amber);
-    letter-spacing: 0.06em;
-  }
+    .loading-state{display:flex;align-items:center;gap:10px;color:var(--muted);font-family:'Courier Prime',monospace;font-size:13px;padding:12px 0}
+    .spinner{width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--gold);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .error-state{color:#f87171;font-size:13px;padding:10px 0;line-height:1.6}
 
-  .logo span {
-    color: var(--white);
-  }
+    /* WEATHER */
+    .weather-grid{display:flex;flex-wrap:wrap;gap:10px}
+    .weather-day{background:var(--mid);border:1px solid var(--border);border-radius:8px;padding:10px 14px;min-width:110px;text-align:center;flex:1}
+    .weather-day .day-name{font-family:'Oswald',sans-serif;font-size:12px;color:var(--gold);letter-spacing:1px;text-transform:uppercase;margin-bottom:2px}
+    .weather-day .date-sub{font-size:10px;color:var(--muted);margin-bottom:6px}
+    .weather-day .emoji{font-size:24px;margin-bottom:4px}
+    .weather-day .hi{font-family:'Oswald',sans-serif;font-size:22px;font-weight:700;color:#fff}
+    .weather-day .lo{font-family:'Oswald',sans-serif;font-size:13px;color:var(--muted)}
+    .weather-day .desc{font-size:11px;color:var(--muted);margin-top:3px}
+    .weather-day .precip{font-size:11px;color:#60A5FA;margin-top:2px}
+    .weather-alert{background:#3B1515;border:1px solid var(--red);border-radius:6px;padding:8px 12px;font-size:13px;color:#FCA5A5;margin-bottom:12px;line-height:1.5}
 
-  .on-air-badge {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-family: var(--mono);
-    font-size: 0.7rem;
-    font-weight: bold;
-    letter-spacing: 0.15em;
-    color: var(--red-on);
-    opacity: 0;
-    transition: opacity 0.3s;
-  }
+    /* ITEMS */
+    .item{border-bottom:1px solid var(--border);padding:10px 0}
+    .item:last-child{border-bottom:none}
+    .item-label{font-family:'Oswald',sans-serif;font-size:11px;color:var(--red);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:3px}
+    .item-title{font-weight:600;font-size:14px;color:#fff;margin-bottom:2px;line-height:1.4}
+    .item-title a{color:#fff;text-decoration:none}
+    .item-title a:hover{color:var(--gold);text-decoration:underline}
+    .item-body{font-size:13px;color:var(--muted);line-height:1.5}
+    .item-meta{font-family:'Courier Prime',monospace;font-size:10px;color:var(--border);margin-top:4px;letter-spacing:.5px}
 
-  .on-air-badge.visible { opacity: 1; }
+    /* BIRTHDAYS */
+    .birthday-list{display:flex;flex-direction:column;gap:8px}
+    .birthday-row{display:flex;align-items:flex-start;gap:12px;background:var(--mid);border-radius:6px;padding:8px 12px}
+    .birthday-age{font-family:'Oswald',sans-serif;font-size:20px;font-weight:700;color:var(--gold);min-width:36px;text-align:center;line-height:1;padding-top:2px}
+    .birthday-name{font-weight:600;font-size:14px;color:#fff}
+    .birthday-name a{color:#fff;text-decoration:none}
+    .birthday-name a:hover{color:var(--gold)}
+    .birthday-note{font-size:12px;color:var(--muted)}
 
-  .on-air-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--red-on);
-    animation: pulse 1s infinite;
-  }
+    /* EVENTS */
+    .event-item{border-left:3px solid var(--gold);padding:6px 0 6px 12px;margin-bottom:10px}
+    .event-date{font-family:'Courier Prime',monospace;font-size:11px;color:var(--gold);text-transform:uppercase;letter-spacing:1px}
+    .event-name{font-weight:600;font-size:14px;color:#fff}
+    .event-name a{color:#fff;text-decoration:none}
+    .event-name a:hover{color:var(--gold);text-decoration:underline}
+    .event-detail{font-size:12px;color:var(--muted);margin-top:2px}
+    .sources-bar{margin-top:14px;padding-top:10px;border-top:1px solid var(--border);font-size:11px;color:var(--muted)}
+    .sources-bar a{color:var(--gold);text-decoration:none}
+    .sources-bar a:hover{text-decoration:underline}
 
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.3; }
-  }
+    /* HEADLINES */
+    .headline-row{display:flex;gap:10px;border-bottom:1px solid var(--border);padding:8px 0;align-items:flex-start}
+    .headline-num{font-family:'Oswald',sans-serif;font-size:20px;color:var(--red);font-weight:700;min-width:28px;line-height:1;padding-top:2px}
+    .headline-text{font-size:13px;color:var(--text);line-height:1.45}
+    .headline-text a{color:var(--text);text-decoration:none}
+    .headline-text a:hover{color:var(--gold);text-decoration:underline}
 
-  /* ── Setup panel ── */
-  #setup {
-    max-width: 1100px;
-    margin: 2rem auto 0;
-    padding: 0 2rem;
-  }
+    /* TRENDING */
+    .tag-cloud{display:flex;flex-wrap:wrap;gap:8px}
+    .tag{background:var(--mid);border:1px solid var(--red);border-radius:20px;padding:5px 12px;font-size:13px;color:var(--gold)}
 
-  .setup-eyebrow {
-    font-family: var(--mono);
-    font-size: 0.7rem;
-    letter-spacing: 0.15em;
-    color: var(--amber);
-    text-transform: uppercase;
-    margin-bottom: 0.75rem;
-  }
+    /* FACTS */
+    .fact-box{background:var(--mid);border-left:4px solid var(--gold);border-radius:0 8px 8px 0;padding:12px 14px;font-size:14px;color:var(--text);line-height:1.6;margin-bottom:10px}
 
-  .setup-title {
-    font-size: 2rem;
-    font-weight: 700;
-    color: var(--white);
-    line-height: 1.2;
-    margin-bottom: 0.5rem;
-  }
+    .source-credit{font-size:10px;color:var(--border);font-family:'Courier Prime',monospace;margin-top:10px;padding-top:8px;border-top:1px solid var(--border)}
 
-  .setup-subtitle {
-    font-size: 0.95rem;
-    color: var(--text-muted);
-    margin-bottom: 1.5rem;
-    line-height: 1.6;
-  }
+    footer{text-align:center;padding:18px;color:var(--border);font-family:'Courier Prime',monospace;font-size:11px;letter-spacing:1px;border-top:1px solid var(--border);margin-top:8px}
+    footer span{color:var(--red)}
 
-  .field-group {
-    margin-bottom: 1.25rem;
-  }
-
-  label {
-    display: block;
-    font-size: 0.78rem;
-    font-family: var(--mono);
-    letter-spacing: 0.08em;
-    color: var(--amber);
-    text-transform: uppercase;
-    margin-bottom: 0.4rem;
-  }
-
-  input[type="text"], select, textarea {
-    width: 100%;
-    background: var(--card-bg);
-    border: 1px solid var(--card-border);
-    color: var(--white);
-    font-family: var(--font);
-    font-size: 0.95rem;
-    padding: 0.65rem 0.9rem;
-    border-radius: 6px;
-    outline: none;
-    transition: border-color 0.2s;
-    appearance: none;
-  }
-
-  input[type="text"]:focus, select:focus, textarea:focus {
-    border-color: var(--amber);
-  }
-
-  select option { background: var(--navy-mid); }
-
-  .segment-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.5rem;
-  }
-
-  .seg-toggle {
-    background: var(--card-bg);
-    border: 1px solid var(--card-border);
-    color: var(--text-muted);
-    font-size: 0.82rem;
-    padding: 0.5rem 0.75rem;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: all 0.15s;
-    text-align: left;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .seg-toggle.active {
-    border-color: var(--amber);
-    color: var(--white);
-    background: rgba(240,165,0,0.08);
-  }
-
-  .seg-toggle .dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--card-border);
-    transition: background 0.15s;
-    flex-shrink: 0;
-  }
-
-  .seg-toggle.active .dot { background: var(--amber); }
-
-  .gen-btn {
-    width: 100%;
-    padding: 0.8rem;
-    background: var(--amber);
-    color: var(--navy);
-    font-family: var(--mono);
-    font-size: 0.9rem;
-    font-weight: bold;
-    letter-spacing: 0.1em;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    margin-top: 1.5rem;
-    transition: background 0.2s, transform 0.1s;
-    text-transform: uppercase;
-  }
-
-  .gen-btn:hover { background: #ffc42a; }
-  .gen-btn:active { transform: scale(0.99); }
-  .gen-btn:disabled { background: var(--amber-dim); cursor: not-allowed; opacity: 0.6; }
-
-  /* ── Loading ── */
-  #loading {
-    display: none;
-    text-align: center;
-    padding: 5rem 2rem;
-  }
-
-  .loading-bars {
-    display: flex;
-    justify-content: center;
-    align-items: flex-end;
-    gap: 4px;
-    height: 40px;
-    margin-bottom: 1.5rem;
-  }
-
-  .loading-bars span {
-    width: 5px;
-    background: var(--amber);
-    border-radius: 3px;
-    animation: equalizer 1s ease-in-out infinite;
-  }
-
-  .loading-bars span:nth-child(1) { animation-delay: 0s; height: 10px; }
-  .loading-bars span:nth-child(2) { animation-delay: 0.1s; height: 20px; }
-  .loading-bars span:nth-child(3) { animation-delay: 0.2s; height: 30px; }
-  .loading-bars span:nth-child(4) { animation-delay: 0.3s; height: 20px; }
-  .loading-bars span:nth-child(5) { animation-delay: 0.4s; height: 10px; }
-
-  @keyframes equalizer {
-    0%, 100% { transform: scaleY(1); }
-    50% { transform: scaleY(2.5); }
-  }
-
-  .loading-text {
-    font-family: var(--mono);
-    font-size: 0.85rem;
-    color: var(--amber);
-    letter-spacing: 0.1em;
-  }
-
-  /* ── Results ── */
-  #results {
-    display: none;
-    max-width: 1100px;
-    margin: 0 auto;
-    padding: 1.5rem 2rem 4rem;
-  }
-
-  .results-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 1.5rem;
-    padding-bottom: 1rem;
-    border-bottom: 1px solid var(--card-border);
-    flex-wrap: wrap;
-    gap: 0.75rem;
-  }
-
-  .results-meta {
-    font-family: var(--mono);
-    font-size: 0.75rem;
-    color: var(--text-muted);
-    letter-spacing: 0.05em;
-  }
-
-  .results-meta strong { color: var(--amber); }
-
-  .reset-btn {
-    background: transparent;
-    border: 1px solid var(--card-border);
-    color: var(--text-muted);
-    font-family: var(--mono);
-    font-size: 0.72rem;
-    letter-spacing: 0.08em;
-    padding: 0.4rem 0.9rem;
-    border-radius: 4px;
-    cursor: pointer;
-    text-transform: uppercase;
-    transition: all 0.15s;
-  }
-
-  .reset-btn:hover { border-color: var(--amber); color: var(--amber); }
-
-  .print-btn {
-    background: var(--amber);
-    border: none;
-    color: var(--navy);
-    font-family: var(--mono);
-    font-size: 0.72rem;
-    font-weight: bold;
-    letter-spacing: 0.08em;
-    padding: 0.4rem 0.9rem;
-    border-radius: 4px;
-    cursor: pointer;
-    text-transform: uppercase;
-  }
-
-  /* ── Segment cards ── */
-  .segment {
-    background: var(--card-bg);
-    border: 1px solid var(--card-border);
-    border-radius: 8px;
-    margin-bottom: 1rem;
-    overflow: hidden;
-    break-inside: avoid;
-  }
-
-  .segment-header {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 0.65rem 1rem;
-    background: var(--navy-light);
-    border-bottom: 1px solid var(--card-border);
-  }
-
-  .seg-label {
-    font-family: var(--mono);
-    font-size: 0.65rem;
-    font-weight: bold;
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
-    padding: 2px 8px;
-    border-radius: 3px;
-  }
-
-  .seg-label.weather  { background: #1a3a5c; color: #7bbfee; }
-  .seg-label.news     { background: #2a1a1a; color: #ee8877; }
-  .seg-label.events   { background: #1a2a1a; color: #88cc77; }
-  .seg-label.birthday { background: #2a1a2a; color: #cc88dd; }
-  .seg-label.trending { background: #2a2a1a; color: #ddcc55; }
-  .seg-label.music    { background: #1a1a3a; color: #8899ee; }
-  .seg-label.sports   { background: #1a2820; color: #55cc99; }
-  .seg-label.viral    { background: #2a1f1a; color: #ee9966; }
-  .seg-label.trivia   { background: #221a2a; color: #bb88ff; }
-
-  .seg-title {
-    font-size: 0.88rem;
-    font-weight: 600;
-    color: var(--white);
-  }
-
-  .segment-body {
-    padding: 1rem 1.25rem;
-    font-size: 0.9rem;
-    line-height: 1.7;
-    color: var(--text-body);
-  }
-
-  .segment-body ul {
-    list-style: none;
-    padding: 0;
-  }
-
-  .segment-body ul li {
-    padding: 0.35rem 0;
-    border-bottom: 1px solid rgba(36,56,80,0.6);
-    display: flex;
-    gap: 0.5rem;
-  }
-
-  .segment-body ul li:last-child { border-bottom: none; }
-
-  .bullet {
-    color: var(--amber);
-    flex-shrink: 0;
-    margin-top: 2px;
-  }
-
-  .talk-line {
-    background: rgba(240,165,0,0.06);
-    border-left: 3px solid var(--amber);
-    padding: 0.5rem 0.75rem;
-    margin-top: 0.75rem;
-    font-style: italic;
-    font-size: 0.85rem;
-    color: var(--amber-pale);
-    border-radius: 0 4px 4px 0;
-  }
-
-  .talk-label {
-    font-style: normal;
-    font-family: var(--mono);
-    font-size: 0.65rem;
-    letter-spacing: 0.1em;
-    color: var(--amber);
-    display: block;
-    margin-bottom: 4px;
-  }
-
-  /* Error state */
-  .error-box {
-    background: rgba(230,57,70,0.1);
-    border: 1px solid rgba(230,57,70,0.3);
-    border-radius: 6px;
-    padding: 1rem 1.25rem;
-    color: #f08090;
-    font-size: 0.88rem;
-    margin-top: 1rem;
-  }
-
-  @media print {
-    header, .reset-btn, .print-btn, #setup, #loading { display: none !important; }
-    body { background: white; color: black; }
-    .segment { border: 1px solid #ccc; page-break-inside: avoid; }
-    .segment-header { background: #f0f0f0; }
-    .seg-title { color: black; }
-    .segment-body { color: #333; }
-    #results { display: block !important; }
-  }
-</style>
+    @media(max-width:600px){.grid{padding:12px;gap:12px}header{padding:10px 14px}}
+  </style>
 </head>
 <body>
 
 <header>
-  <div class="logo">SHOW<span>PREP</span></div>
-  <div class="on-air-badge" id="onAirBadge">
+  <div class="header-left">
     <div class="on-air-dot"></div>
-    ON AIR
+    <div>
+      <div class="station-name"><span>92.1</span> WVTK</div>
+      <div class="tagline">Addison County's Radio Station · Show Prep Dashboard</div>
+    </div>
   </div>
+  <div id="clock">--:-- --</div>
+  <button id="refresh-all-btn" onclick="refreshAll()">⟳ Refresh All</button>
 </header>
 
-<!-- Setup -->
-<div id="setup">
-  <p class="setup-eyebrow">&#9679; Radio Show Prep Tool</p>
-  <h1 class="setup-title">Your show,<br>prepped in seconds.</h1>
-  <p class="setup-subtitle">Enter your market and show format. We'll generate everything you need to fill the air — weather, news, trending topics, celebrity birthdays, and more.</p>
+<div class="grid">
 
-  <!-- Top row: 3 fields side by side -->
-  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1.25rem;margin-bottom:1.25rem;">
-    <div class="field-group" style="margin-bottom:0;">
-      <label for="location">City / Market</label>
-      <input type="text" id="location" placeholder="e.g. Burlington, VT" />
+  <div class="card wide">
+    <div class="card-header">
+      <div class="card-title">🌤 Middlebury, VT — Weather Forecast</div>
+      <button class="refresh-btn" onclick="loadWeather()">↻ Refresh</button>
     </div>
-    <div class="field-group" style="margin-bottom:0;">
-      <label for="format">Daypart</label>
-      <select id="format">
-        <option value="morning drive (5am–10am), high energy, commuter-focused">&#9728; Morning Drive (5am – 10am)</option>
-        <option value="midday (10am–3pm), relaxed and conversational">&#9788; Midday (10am – 3pm)</option>
-        <option value="afternoon drive (3pm–7pm), high energy, commuter-focused">&#128663; Afternoon Drive (3pm – 7pm)</option>
-        <option value="evening/night show (7pm–midnight), chill and music-heavy">&#9790; Evening / Night Show</option>
-        <option value="weekend show, relaxed and fun">&#127774; Weekend Show</option>
-      </select>
-    </div>
-    <div class="field-group" style="margin-bottom:0;">
-      <label for="genre">Music Format</label>
-      <select id="genre">
-        <option value="Top 40/Pop">Top 40 / Pop</option>
-        <option value="Country">Country</option>
-        <option value="Hip-Hop/R&B">Hip-Hop / R&amp;B</option>
-        <option value="Rock/Alternative">Rock / Alternative</option>
-        <option value="Adult Contemporary">Adult Contemporary</option>
-        <option value="Classic Hits">Classic Hits / Oldies</option>
-        <option value="News/Talk">News / Talk</option>
-      </select>
-    </div>
+    <div class="card-body" id="body-weather"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
   </div>
 
-  <!-- Segments row + Generate button -->
-  <div style="display:grid;grid-template-columns:1fr auto;gap:1.5rem;align-items:end;">
-    <div class="field-group" style="margin-bottom:0;">
-      <label>Segments to Include</label>
-      <div class="segment-grid" style="grid-template-columns:repeat(5,1fr);">
-        <button class="seg-toggle active" data-seg="weather"><span class="dot"></span>&#127784; Weather</button>
-        <button class="seg-toggle active" data-seg="news"><span class="dot"></span>&#128240; Local News</button>
-        <button class="seg-toggle active" data-seg="events"><span class="dot"></span>&#127881; Events</button>
-        <button class="seg-toggle active" data-seg="birthday"><span class="dot"></span>&#127874; Birthdays</button>
-        <button class="seg-toggle active" data-seg="trending"><span class="dot"></span>&#128200; Trending</button>
-        <button class="seg-toggle active" data-seg="music"><span class="dot"></span>&#127925; Music News</button>
-        <button class="seg-toggle" data-seg="sports"><span class="dot"></span>&#127944; Sports</button>
-        <button class="seg-toggle" data-seg="viral"><span class="dot"></span>&#128247; Viral News</button>
-        <button class="seg-toggle" data-seg="trivia"><span class="dot"></span>&#129300; Trivia</button>
-      </div>
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">📅 Today in History</div>
+      <button class="refresh-btn" onclick="loadHistory()">↻ Refresh</button>
     </div>
-    <button class="gen-btn" id="genBtn" onclick="generatePrep()" style="width:160px;margin-top:0;white-space:nowrap;">&#9654; Generate</button>
+    <div class="card-body" id="body-history"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
   </div>
 
-  <div id="setupError"></div>
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">🎂 Celebrity Birthdays Today</div>
+      <button class="refresh-btn" onclick="loadBirthdays()">↻ Refresh</button>
+    </div>
+    <div class="card-body" id="body-birthdays"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">📌 Community Calendar</div>
+      <button class="refresh-btn" onclick="loadEvents()">↻ Refresh</button>
+    </div>
+    <div class="card-body" id="body-events"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">🎸 Classic Hits &amp; Rock News</div>
+      <button class="refresh-btn" onclick="loadMusicNews()">↻ Refresh</button>
+    </div>
+    <div class="card-body" id="body-musicnews"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">📰 Top News Headlines</div>
+      <button class="refresh-btn" onclick="loadNews()">↻ Refresh</button>
+    </div>
+    <div class="card-body" id="body-news"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">🔥 What's Trending</div>
+      <button class="refresh-btn" onclick="loadTrending()">↻ Refresh</button>
+    </div>
+    <div class="card-body" id="body-trending"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">💡 Random Facts</div>
+      <button class="refresh-btn" onclick="loadFacts()">↻ Refresh</button>
+    </div>
+    <div class="card-body" id="body-facts"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
+  </div>
+
 </div>
 
-<!-- Loading -->
-<div id="loading">
-  <div class="loading-bars">
-    <span></span><span></span><span></span><span></span><span></span>
-  </div>
-  <p class="loading-text" id="loadingText">PULLING PREP...</p>
-</div>
-
-<!-- Results -->
-<div id="results">
-  <div class="results-header">
-    <div class="results-meta">
-      <strong id="resultMarket"></strong> &nbsp;·&nbsp; <span id="resultFormat"></span> &nbsp;·&nbsp; <span id="resultDate"></span>
-    </div>
-    <div style="display:flex;gap:8px;">
-      <button class="reset-btn" onclick="resetForm()">&#8592; New Prep</button>
-      <button class="print-btn" onclick="window.print()">&#128438; Print Rundown</button>
-    </div>
-  </div>
-  <div id="segmentsContainer"></div>
-</div>
+<footer>92.1 WVTK · <span>Addison County's Radio Station</span> · Show Prep Dashboard</footer>
 
 <script>
-  const SEG_TOGGLES = document.querySelectorAll('.seg-toggle');
-  SEG_TOGGLES.forEach(btn => {
-    btn.addEventListener('click', () => btn.classList.toggle('active'));
-  });
+/* ── CLOCK ── */
+function updateClock(){
+  const n=new Date();
+  document.getElementById('clock').textContent=
+    n.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+setInterval(updateClock,1000); updateClock();
 
-  const LOADING_MESSAGES = [
-    "PULLING PREP...",
-    "CHECKING WEATHER RADAR...",
-    "SCANNING TRENDING TOPICS...",
-    "FINDING CELEBRITY BIRTHDAYS...",
-    "WRITING YOUR TALK BREAKS..."
-  ];
-
-  function getActiveSegments() {
-    return [...SEG_TOGGLES].filter(b => b.classList.contains('active')).map(b => b.dataset.seg);
-  }
-
-  const SEG_META = {
-    weather:  { label: 'weather',  title: '&#127784; Weather Forecast',     labelText: 'WEATHER'  },
-    news:     { label: 'news',     title: '&#128240; Local News',            labelText: 'NEWS'     },
-    events:   { label: 'events',   title: '&#127881; Community Events',      labelText: 'EVENTS'   },
-    birthday: { label: 'birthday', title: '&#127874; Celebrity Birthdays',   labelText: 'BIRTHDAYS'},
-    trending: { label: 'trending', title: '&#128200; What\'s Trending',      labelText: 'TRENDING' },
-    music:    { label: 'music',    title: '&#127925; Music News',            labelText: 'MUSIC'    },
-    sports:   { label: 'sports',   title: '&#127944; Sports Recap',          labelText: 'SPORTS'   },
-    viral:    { label: 'viral',    title: '&#128247; Viral & Weird News',    labelText: 'VIRAL'    },
-    trivia:   { label: 'trivia',   title: '&#129300; Trivia & Fun Facts',    labelText: 'TRIVIA'   },
-  };
-
-  async function generatePrep() {
-    const location = document.getElementById('location').value.trim();
-    const format = document.getElementById('format').value;
-    const genre = document.getElementById('genre').value;
-    const segs = getActiveSegments();
-    const errEl = document.getElementById('setupError');
-    errEl.innerHTML = '';
-
-    if (!location) {
-      errEl.innerHTML = '<div class="error-box">&#9888; Please enter a city or market.</div>';
-      return;
-    }
-    if (segs.length === 0) {
-      errEl.innerHTML = '<div class="error-box">&#9888; Please select at least one segment.</div>';
-      return;
-    }
-
-    document.getElementById('setup').style.display = 'none';
-    document.getElementById('results').style.display = 'none';
-    const loadingEl = document.getElementById('loading');
-    loadingEl.style.display = 'block';
-
-    let msgIdx = 0;
-    const msgInterval = setInterval(() => {
-      msgIdx = (msgIdx + 1) % LOADING_MESSAGES.length;
-      document.getElementById('loadingText').textContent = LOADING_MESSAGES[msgIdx];
-    }, 1800);
-
-    const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-
-    const segmentInstructions = {
-      weather: `WEATHER: Use ONLY the real weather data provided in the REAL DATA block above. Do not invent or estimate weather. Convert the forecast into a radio-friendly outlook covering today, tonight, and tomorrow. Write a warm, conversational talk break (2-3 sentences) a DJ can read naturally — like a friend telling you what to expect outside, not a stiff forecast.`,
-      news: `LOCAL NEWS: Use ONLY the real local news headlines from the REAL DATA block above. Do not fabricate any stories. Pick the 3-4 most interesting/relevant stories for a ${genre} audience in ${location}. Rewrite each as a punchy radio headline with 2-3 bullet point details. If local headlines are thin, use the strongest national ones. Add a one-liner DJ intro to toss to the stories.`,
-      events: `COMMUNITY EVENTS: Use your web search tool to find REAL community events happening this week in ${location}. Search for "${location} community events this week" and "${location} things to do this weekend". Return 4-5 actual upcoming events with real names, dates, times, and locations. Only include events you can confirm exist from real search results.`,
-      birthday: `CELEBRITY BIRTHDAYS: List 4-5 celebrities with birthdays TODAY (${today}). CRITICAL: Only include people who are CONFIRMED ALIVE. Do not include anyone who has died — Brian Wilson died June 11 2025, do not include him. If unsure whether someone is alive, leave them out. Include name, age turning today, and one punchy interesting fact. Focus on names a ${genre} audience would recognize.`,
-      trending: `TRENDING TOPICS: Using the ENTERTAINMENT & TRENDING HEADLINES from the REAL DATA block above, identify 4-5 topics that are buzzing right now. For each: name the topic, explain briefly why it's trending based on the real headlines, and suggest a listener phone question the DJ can throw to callers.`,
-      music: `MUSIC NEWS: Using the MUSIC NEWS HEADLINES from the REAL DATA block above, write up 3-4 music news items relevant to a ${genre} station. Rewrite the real headlines in a punchy, radio-friendly style. Add context where helpful. Write it like a music reporter's fast briefing.`,
-      sports: `SPORTS RECAP: Using the REAL SPORTS SCORES from the REAL DATA block above, write a punchy sports update. Cover whichever leagues have games listed. Pull out the most interesting scores, upsets, or storylines. Keep it fast and fun — this is radio, not SportsCenter.`,
-      viral: `VIRAL & WEIRD NEWS: Using the VIRAL/WEIRD NEWS HEADLINES from the REAL DATA block above, pick 3 fun, strange, or only-on-the-internet stories. For each: write a punchy headline, summarize the key facts in 1-2 sentences, and add a suggested DJ reaction or listener question. Keep it fun and safe for all audiences.`,
-      trivia: `TRIVIA & FUN FACTS: Provide 2-3 trivia questions with answers and 2-3 surprising fun facts connected to today (${today}) or relevant to a ${genre} audience. Keep them fresh and avoid overused classics. Format clearly with the answer on a separate line after each question.`,
-    };
-
-    const requestedInstructions = segs.map(s => segmentInstructions[s]).join('\n\n');
-
-        const systemPrompt = `You are a veteran radio show prep writer with 20 years of morning drive experience. You write show prep for a ${genre} station in ${location}. Today is ${today}. Show: ${format}.
-
-Real data has been provided at the top of the user message. Your job is to turn that data into tight, radio-ready content.
-
-RULES — NON-NEGOTIABLE:
-1. Write everything confidently. No disclaimers. No "verify before airing." No "check other sources." This is prep the host reads on air RIGHT NOW.
-2. Use the real data provided. If weather data is there, use the actual numbers. If ESPN scores are there, use the actual teams and scores.
-3. Never say data is unavailable. Never suggest the host look elsewhere. If data is thin, fill it with good seasonal/relevant content and write it confidently.
-4. Celebrity birthdays: only list people who are ALIVE. Brian Wilson died June 11 2025. When in doubt, skip them.
-5. Be punchy, warm, and conversational — write like you talk, not like you type.
-
-RESPONSE FORMAT — ONLY valid JSON, no markdown, no preamble:
-{
-  "segmentKey": {
-    "items": ["bullet 1", "bullet 2", ...],
-    "talkBreak": "2-3 sentence on-air read, conversational tone"
-  }
+/* ── DATE HELPERS ── */
+const TODAY=new Date();
+function dayName(offset){
+  const d=new Date(TODAY); d.setDate(d.getDate()+offset);
+  return offset===0?'Today':offset===1?'Tomorrow':d.toLocaleDateString('en-US',{weekday:'short'});
+}
+function shortDate(offset){
+  const d=new Date(TODAY); d.setDate(d.getDate()+offset);
+  return d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
 }
 
-Segment keys to include: \${segs.join(', ')}
+/* ── WMO CODE MAP ── */
+const WMO={
+  0:'☀️ Clear',1:'🌤 Mostly Clear',2:'⛅ Partly Cloudy',3:'☁️ Overcast',
+  45:'🌫 Foggy',48:'🌫 Icy Fog',51:'🌦 Light Drizzle',53:'🌦 Drizzle',55:'🌧 Heavy Drizzle',
+  61:'🌧 Light Rain',63:'🌧 Rain',65:'🌧 Heavy Rain',
+  71:'🌨 Light Snow',73:'🌨 Snow',75:'❄️ Heavy Snow',77:'🌨 Snow Grains',
+  80:'🌦 Showers',81:'🌧 Heavy Showers',82:'⛈ Violent Showers',
+  85:'🌨 Snow Showers',86:'❄️ Heavy Snow Showers',
+  95:'⛈ Thunderstorm',96:'⛈ Thunderstorm+Hail',99:'⛈ Heavy Thunderstorm'
+};
+function wmoLabel(code){
+  const e=WMO[code]||'🌡 Unknown';
+  const i=e.indexOf(' ');
+  return {emoji:e.slice(0,i),desc:e.slice(i+1)};
+}
 
-For news and events: format items as "HEADLINE || detail1 | detail2 | detail3"
-All other segments: items are plain strings
+/* ── CORS PROXY for RSS ── */
+function proxied(url){
+  return 'https://api.allorigins.win/get?url='+encodeURIComponent(url);
+}
 
-The talkBreak is what the DJ reads live. Make it sound human — like they just thought of it.`
+/* ── FETCH RSS via proxy ── */
+async function fetchRSS(url){
+  const res=await fetch(proxied(url));
+  if(!res.ok) throw new Error('Proxy fetch failed: '+res.status);
+  const data=await res.json();
+  const parser=new DOMParser();
+  return parser.parseFromString(data.contents,'text/xml');
+}
 
-    const WORKER_URL = 'https://yellow-dust-4e2d.radiodoctorjd.workers.dev/';
+/* ── UI HELPERS ── */
+function setLoading(id){
+  document.getElementById(id).innerHTML='<div class="loading-state"><div class="spinner"></div>Loading…</div>';
+}
+function setError(id,msg){
+  document.getElementById(id).innerHTML=`<div class="error-state">⚠ ${msg}</div>`;
+}
+function strip(html){
+  return (html||'').replace(/<[^>]+>/g,'').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&nbsp;/g,' ').trim();
+}
+function fmt(dateStr){
+  const d=new Date(dateStr);
+  return isNaN(d)?dateStr:d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+}
 
-    try {
-      let response;
-      try {
-        response = await fetch(WORKER_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: 'claude-sonnet-4-6',
-            max_tokens: 8000,
-            location: location,
-            system: systemPrompt,
-            messages: [{ role: 'user', content: requestedInstructions }]
-          })
-        });
-      } catch (networkErr) {
-        throw new Error('Network error — could not reach the Worker. Check that the Worker is deployed and CORS is set to allow all origins (*). Detail: ' + networkErr.message);
+/* ══════════════════════════════════════════
+   WEATHER — Open-Meteo + NWS Alerts
+══════════════════════════════════════════ */
+async function loadWeather(){
+  setLoading('body-weather');
+  try {
+    const [fRes,aRes]=await Promise.allSettled([
+      fetch('https://api.open-meteo.com/v1/forecast?latitude=44.0153&longitude=-73.1673&daily=temperature_2m_max,temperature_2m_min,weathercode,precipitation_probability_max&temperature_unit=fahrenheit&timezone=America%2FNew_York&forecast_days=5'),
+      fetch('https://api.weather.gov/alerts/active?area=VT',{headers:{'User-Agent':'WVTK-ShowPrep/1.0','Accept':'application/geo+json'}})
+    ]);
+
+    if(fRes.status==='rejected') throw new Error('Weather API unavailable');
+    const fData=await fRes.value.json();
+    const d=fData.daily;
+
+    let alertHTML='';
+    if(aRes.status==='fulfilled'&&aRes.value.ok){
+      const aData=await aRes.value.json();
+      const active=(aData.features||[]).filter(f=>
+        (f.properties.areaDesc||'').match(/Addison|Chittenden|Rutland|Vermont/i)
+      );
+      if(active.length){
+        alertHTML=active.slice(0,2).map(f=>{
+          const p=f.properties;
+          return `<div class="weather-alert">⚠ <strong>${p.event}</strong> — ${(p.headline||'').slice(0,140)}</div>`;
+        }).join('');
       }
-
-      const rawBody = await response.text();
-      clearInterval(msgInterval);
-      loadingEl.style.display = 'none';
-
-      if (!response.ok) {
-        throw new Error('Worker returned HTTP ' + response.status + ': ' + rawBody.slice(0, 200));
-      }
-
-      let data;
-      try { data = JSON.parse(rawBody); } catch(e) {
-        throw new Error('Worker response was not valid JSON: ' + rawBody.slice(0, 200));
-      }
-
-      if (!data.content) {
-        throw new Error('Unexpected API response: ' + JSON.stringify(data).slice(0, 200));
-      }
-
-      // Filter for text blocks only — ignore tool_use and tool_result blocks from web search
-      const rawText = data.content.filter(b => b.type === 'text').map(b => b.text).join('');
-      const clean = rawText.replace(/^```json\s*/,'').replace(/```\s*$/,'').trim();
-
-      let parsed;
-      try { parsed = JSON.parse(clean); } catch(e) {
-        throw new Error('Could not parse AI response as JSON. Raw: ' + clean.slice(0, 200));
-      }
-
-      // Normalize keys — Claude sometimes uses camelCase, we need our keys
-      const keyMap = {
-        localNews: 'news',
-        communityEvents: 'events',
-        celebrityBirthdays: 'birthday',
-        trendingTopics: 'trending',
-        musicNews: 'music',
-        sportsRecap: 'sports',
-        viralWeirdNews: 'viral',
-        triviaAndFunFacts: 'trivia',
-        weatherForecast: 'weather',
-      };
-      const normalized = {};
-      for (const [k, v] of Object.entries(parsed)) {
-        normalized[keyMap[k] || k] = v;
-      }
-      parsed = normalized;
-
-      renderResults(parsed, segs, location, format, genre, today);
-
-    } catch (err) {
-      console.error('ShowPrep error:', err);
-      clearInterval(msgInterval);
-      loadingEl.style.display = 'none';
-      document.getElementById('setup').style.display = 'block';
-      document.getElementById('setupError').innerHTML = '<div class="error-box">&#9888; <strong>' + err.message + '</strong></div>';
     }
-  }
 
-  function renderResults(data, segs, location, format, genre, today) {
-    document.getElementById('resultMarket').textContent = location;
-    document.getElementById('resultFormat').textContent = genre + ' · ' + format.split(',')[0];
-    document.getElementById('resultDate').textContent = today;
+    let html=alertHTML+'<div class="weather-grid">';
+    for(let i=0;i<5;i++){
+      const {emoji,desc}=wmoLabel(d.weathercode[i]);
+      const precip=d.precipitation_probability_max[i];
+      html+=`<div class="weather-day">
+        <div class="day-name">${dayName(i)}</div>
+        <div class="date-sub">${shortDate(i)}</div>
+        <div class="emoji">${emoji}</div>
+        <div class="hi">${Math.round(d.temperature_2m_max[i])}°</div>
+        <div class="lo">/ ${Math.round(d.temperature_2m_min[i])}°F</div>
+        <div class="desc">${desc}</div>
+        ${precip!=null?`<div class="precip">💧 ${precip}%</div>`:''}
+      </div>`;
+    }
+    html+='</div><div class="source-credit">Open-Meteo.com · NWS Alerts · Middlebury VT (44.02°N 73.17°W)</div>';
+    document.getElementById('body-weather').innerHTML=html;
+  } catch(e){ setError('body-weather',e.message); }
+}
 
-    const container = document.getElementById('segmentsContainer');
-    container.innerHTML = '';
-    container.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:1rem;';
+/* ══════════════════════════════════════════
+   TODAY IN HISTORY — Wikipedia API
+══════════════════════════════════════════ */
+async function loadHistory(){
+  setLoading('body-history');
+  try {
+    const mm=String(TODAY.getMonth()+1).padStart(2,'0');
+    const dd=String(TODAY.getDate()).padStart(2,'0');
+    const res=await fetch(`https://en.wikipedia.org/api/rest_v1/feed/onthisday/events/${mm}/${dd}`);
+    if(!res.ok) throw new Error('Wikipedia API returned '+res.status);
+    const data=await res.json();
+    const events=data.events||[];
 
-    segs.forEach(segKey => {
-      const segData = data[segKey];
-      if (!segData) return;
-      const meta = SEG_META[segKey];
-      const card = document.createElement('div');
-      card.className = 'segment';
+    // Pick a spread across eras
+    const buckets=[[1800,1900],[1900,1945],[1945,1970],[1970,1990],[1990,2010],[2010,2100]];
+    const picks=[];
+    for(const [lo,hi] of buckets){
+      const c=events.filter(e=>e.year>=lo&&e.year<hi);
+      if(c.length) picks.push(c[Math.floor(Math.random()*Math.min(c.length,3))]);
+      if(picks.length>=7) break;
+    }
+    while(picks.length<6&&events.length){
+      const e=events[Math.floor(Math.random()*events.length)];
+      if(!picks.includes(e)) picks.push(e);
+    }
 
-      const isHeadlineStyle = (segKey === 'news' || segKey === 'events');
+    let html=`<div style="font-family:'Courier Prime',monospace;font-size:11px;color:var(--muted);margin-bottom:10px;letter-spacing:1px;text-transform:uppercase">
+      ${TODAY.toLocaleDateString('en-US',{month:'long',day:'numeric'})} in History</div>`;
+    picks.slice(0,7).forEach(ev=>{
+      const page=ev.pages&&ev.pages[0];
+      const url=page&&page.content_urls&&page.content_urls.desktop&&page.content_urls.desktop.page;
+      html+=`<div class="item">
+        <div class="item-label">${ev.year}</div>
+        <div class="item-title">${url?`<a href="${url}" target="_blank">${ev.text}</a>`:ev.text}</div>
+      </div>`;
+    });
+    html+='<div class="source-credit">Source: Wikipedia On This Day API</div>';
+    document.getElementById('body-history').innerHTML=html;
+  } catch(e){ setError('body-history',e.message); }
+}
 
-      let itemsHTML = '<ul>';
-      (segData.items || []).forEach(item => {
-        if (isHeadlineStyle && item.includes('||')) {
-          const [headline, ...details] = item.split('||');
-          const detailParts = (details.join('') || '').split('|').map(s => s.trim()).filter(Boolean);
-          itemsHTML += `<li style="flex-direction:column;gap:4px;">
-            <strong style="color:var(--white);font-size:0.88rem;">${headline.trim()}</strong>
-            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:2px;">
-              ${detailParts.map(d => `<span style="font-size:0.78rem;color:var(--text-muted);">&#9656; ${d}</span>`).join('')}
-            </div>
-          </li>`;
-        } else {
-          itemsHTML += `<li><span class="bullet">&#9656;</span><span>${item}</span></li>`;
-        }
-      });
-      itemsHTML += '</ul>';
+/* ══════════════════════════════════════════
+   CELEBRITY BIRTHDAYS — Wikipedia API
+══════════════════════════════════════════ */
+async function loadBirthdays(){
+  setLoading('body-birthdays');
+  try {
+    const mm=String(TODAY.getMonth()+1).padStart(2,'0');
+    const dd=String(TODAY.getDate()).padStart(2,'0');
+    const res=await fetch(`https://en.wikipedia.org/api/rest_v1/feed/onthisday/births/${mm}/${dd}`);
+    if(!res.ok) throw new Error('Wikipedia API returned '+res.status);
+    const data=await res.json();
+    const yr=TODAY.getFullYear();
 
-      card.innerHTML = `
-        <div class="segment-header">
-          <span class="seg-label ${segKey}">${meta.labelText}</span>
-          <span class="seg-title">${meta.title}</span>
+    const notable=(data.births||[])
+      .filter(b=>b.pages&&b.pages.length&&b.pages[0].description)
+      .map(b=>{
+        const p=b.pages[0];
+        return {
+          year:b.year, age:yr-b.year,
+          name:p.title, desc:p.description||'',
+          url:p.content_urls&&p.content_urls.desktop?p.content_urls.desktop.page:null,
+          descLen:(p.description||'').length
+        };
+      })
+      .filter(b=>b.age>0&&b.age<115)
+      .sort((a,b)=>b.descLen-a.descLen)
+      .slice(0,10);
+
+    let html='<div class="birthday-list">';
+    notable.forEach(b=>{
+      html+=`<div class="birthday-row">
+        <div class="birthday-age">${b.age}</div>
+        <div>
+          <div class="birthday-name">🎂 ${b.url?`<a href="${b.url}" target="_blank">${b.name}</a>`:b.name}</div>
+          <div class="birthday-note">${b.desc}</div>
+          <div class="item-meta">Born ${b.year}</div>
         </div>
-        <div class="segment-body">
-          ${itemsHTML}
-          ${segData.talkBreak ? `<div class="talk-line"><span class="talk-label">&#127908; ON-AIR TALK BREAK</span>${segData.talkBreak}</div>` : ''}
-        </div>`;
+      </div>`;
+    });
+    html+='</div><div class="source-credit">Source: Wikipedia On This Day API</div>';
+    document.getElementById('body-birthdays').innerHTML=html;
+  } catch(e){ setError('body-birthdays',e.message); }
+}
 
-      container.appendChild(card);
+/* ══════════════════════════════════════════
+   COMMUNITY EVENTS — Addison Independent RSS
+   + Front Porch Forum & WVTK links
+══════════════════════════════════════════ */
+async function loadEvents(){
+  setLoading('body-events');
+  try {
+    const xml=await fetchRSS('https://www.addisonindependent.com/feed');
+    const items=Array.from(xml.querySelectorAll('item')).slice(0,12);
+
+    let html='';
+    if(items.length===0){
+      html='<div class="item-body">No items found in feed.</div>';
+    } else {
+      items.forEach(item=>{
+        const title=strip(item.querySelector('title')?.textContent||'');
+        const link=item.querySelector('link')?.textContent?.trim()||
+                   item.querySelector('guid')?.textContent?.trim()||'';
+        const pubDate=fmt(item.querySelector('pubDate')?.textContent||'');
+        const desc=strip(item.querySelector('description')?.textContent||'').slice(0,120);
+        html+=`<div class="event-item">
+          <div class="event-date">📅 ${pubDate}</div>
+          <div class="event-name">${link?`<a href="${link}" target="_blank">${title}</a>`:title}</div>
+          ${desc?`<div class="event-detail">${desc}${desc.length>=120?'…':''}</div>`:''}
+        </div>`;
+      });
+    }
+    html+=`<div class="sources-bar">🔗 Live sources:
+      <a href="https://www.addisonindependent.com" target="_blank">Addison Independent</a> ·
+      <a href="https://www.921wvtk.com" target="_blank">921wvtk.com</a> ·
+      <a href="https://frontporchforum.com/middlebury/calendar?area_id=middlebury&neighbor_areas=true" target="_blank">Front Porch Forum</a>
+    </div>`;
+    document.getElementById('body-events').innerHTML=html;
+  } catch(e){ setError('body-events',e.message+' — <a href="https://www.addisonindependent.com" target="_blank" style="color:var(--gold)">Visit Addison Independent</a>'); }
+}
+
+/* ══════════════════════════════════════════
+   CLASSIC HITS & ROCK NEWS — Ultimate Classic Rock RSS
+══════════════════════════════════════════ */
+async function loadMusicNews(){
+  setLoading('body-musicnews');
+  try {
+    const xml=await fetchRSS('https://ultimateclassicrock.com/feed/');
+    const items=Array.from(xml.querySelectorAll('item')).slice(0,8);
+
+    let html='';
+    items.forEach(item=>{
+      const title=strip(item.querySelector('title')?.textContent||'');
+      const link=item.querySelector('link')?.textContent?.trim()||
+                 item.querySelector('guid')?.textContent?.trim()||'';
+      const pubDate=fmt(item.querySelector('pubDate')?.textContent||'');
+      const desc=strip(item.querySelector('description')?.textContent||'').slice(0,100);
+      html+=`<div class="item">
+        <div class="item-label">🎸 ${pubDate}</div>
+        <div class="item-title">${link?`<a href="${link}" target="_blank">${title}</a>`:title}</div>
+        ${desc?`<div class="item-body">${desc}${desc.length>=100?'…':''}</div>`:''}
+      </div>`;
+    });
+    html+='<div class="source-credit">Source: Ultimate Classic Rock (ultimateclassicrock.com)</div>';
+    document.getElementById('body-musicnews').innerHTML=html;
+  } catch(e){ setError('body-musicnews',e.message); }
+}
+
+/* ══════════════════════════════════════════
+   TOP NEWS — NPR + VT Digger RSS
+══════════════════════════════════════════ */
+async function loadNews(){
+  setLoading('body-news');
+  try {
+    const [nprRes,vtRes]=await Promise.allSettled([
+      fetchRSS('https://feeds.npr.org/1001/rss.xml'),
+      fetchRSS('https://vtdigger.org/feed/')
+    ]);
+
+    const items=[];
+
+    if(nprRes.status==='fulfilled'){
+      Array.from(nprRes.value.querySelectorAll('item')).slice(0,6).forEach(item=>{
+        items.push({
+          title:strip(item.querySelector('title')?.textContent||''),
+          link:item.querySelector('link')?.textContent?.trim()||item.querySelector('guid')?.textContent?.trim()||'',
+          date:fmt(item.querySelector('pubDate')?.textContent||''),
+          source:'NPR'
+        });
+      });
+    }
+
+    if(vtRes.status==='fulfilled'){
+      Array.from(vtRes.value.querySelectorAll('item')).slice(0,3).forEach(item=>{
+        items.push({
+          title:strip(item.querySelector('title')?.textContent||''),
+          link:item.querySelector('link')?.textContent?.trim()||item.querySelector('guid')?.textContent?.trim()||'',
+          date:fmt(item.querySelector('pubDate')?.textContent||''),
+          source:'VT Digger'
+        });
+      });
+    }
+
+    if(items.length===0) throw new Error('No news items loaded');
+
+    let html='';
+    items.forEach((h,i)=>{
+      html+=`<div class="headline-row">
+        <div class="headline-num">${String(i+1).padStart(2,'0')}</div>
+        <div>
+          <div class="item-label">${h.source} · ${h.date}</div>
+          <div class="headline-text">${h.link?`<a href="${h.link}" target="_blank">${h.title}</a>`:h.title}</div>
+        </div>
+      </div>`;
+    });
+    html+='<div class="source-credit">Sources: NPR News · VT Digger</div>';
+    document.getElementById('body-news').innerHTML=html;
+  } catch(e){ setError('body-news',e.message); }
+}
+
+/* ══════════════════════════════════════════
+   TRENDING — Google Trends RSS
+══════════════════════════════════════════ */
+async function loadTrending(){
+  setLoading('body-trending');
+  try {
+    const xml=await fetchRSS('https://trends.google.com/trends/trendingsearches/daily/rss?geo=US');
+    const items=Array.from(xml.querySelectorAll('item')).slice(0,15);
+
+    if(items.length===0) throw new Error('No trending items found');
+
+    let html='<div class="tag-cloud" style="margin-bottom:14px">';
+    items.forEach(item=>{
+      const title=strip(item.querySelector('title')?.textContent||'');
+      const link=item.querySelector('link')?.textContent?.trim()||'';
+      if(title) html+=`<span class="tag">${link?`<a href="https://trends.google.com/trends/explore?q=${encodeURIComponent(title)}&geo=US" target="_blank" style="color:var(--gold);text-decoration:none">${title}</a>`:title}</span>`;
+    });
+    html+='</div>';
+
+    // Also show top 5 with traffic info
+    items.slice(0,5).forEach(item=>{
+      const title=strip(item.querySelector('title')?.textContent||'');
+      const traffic=item.querySelector('approx_traffic')?.textContent||
+                    item.getElementsByTagNameNS('*','approx_traffic')[0]?.textContent||'';
+      const news=Array.from(item.querySelectorAll('news_item_title,item')).slice(0,1)
+        .map(n=>strip(n.textContent)).filter(Boolean)[0]||'';
+      html+=`<div class="item">
+        <div class="item-label">🔥 ${title}</div>
+        ${traffic?`<div class="item-body">${traffic} searches</div>`:''}
+        ${news?`<div class="item-body" style="color:var(--text)">${news}</div>`:''}
+      </div>`;
     });
 
-    document.getElementById('results').style.display = 'block';
-    document.getElementById('onAirBadge').classList.add('visible');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
+    html+='<div class="source-credit">Source: Google Trends (US)</div>';
+    document.getElementById('body-trending').innerHTML=html;
+  } catch(e){ setError('body-trending',e.message); }
+}
 
-  function resetForm() {
-    document.getElementById('results').style.display = 'none';
-    document.getElementById('onAirBadge').classList.remove('visible');
-    document.getElementById('setup').style.display = 'block';
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
+/* ══════════════════════════════════════════
+   RANDOM FACTS — uselessfacts API
+══════════════════════════════════════════ */
+async function loadFacts(){
+  setLoading('body-facts');
+  try {
+    // Fetch 5 facts in parallel
+    const results=await Promise.allSettled(
+      Array.from({length:5},()=>
+        fetch('https://uselessfacts.jsph.pl/api/v2/facts/random?language=en')
+          .then(r=>r.json())
+      )
+    );
+
+    const facts=results
+      .filter(r=>r.status==='fulfilled'&&r.value&&r.value.text)
+      .map(r=>r.value.text);
+
+    if(facts.length===0) throw new Error('Facts API unavailable');
+
+    let html='';
+    facts.forEach(fact=>{
+      html+=`<div class="fact-box">${fact}</div>`;
+    });
+    html+='<div class="source-credit">Source: uselessfacts.jsph.pl</div>';
+    document.getElementById('body-facts').innerHTML=html;
+  } catch(e){ setError('body-facts',e.message); }
+}
+
+/* ══════════════════════════════════════════
+   REFRESH ALL
+══════════════════════════════════════════ */
+function refreshAll(){
+  loadWeather();
+  loadHistory();
+  loadBirthdays();
+  loadEvents();
+  loadMusicNews();
+  loadNews();
+  loadTrending();
+  loadFacts();
+}
+
+window.addEventListener('DOMContentLoaded', refreshAll);
 </script>
 </body>
 </html>
