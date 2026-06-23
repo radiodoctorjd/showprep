@@ -479,16 +479,19 @@ async function loadBirthdays(){
         let score=desc.length;
         usTerms.forEach(t=>{ if(desc.includes(t)) score+=80; });
         foreignOnlyTerms.forEach(t=>{ if(desc.includes(t)) score-=120; });
-        // Detect if person has passed away — Wikipedia descriptions often say "was a" (past tense)
-        // or the pages array may include a death year
         const rawDesc=p.description||'';
         const deceased=rawDesc.toLowerCase().startsWith('was ')||
                        (b.pages[0].deaths&&b.pages[0].deaths.length>0)||
                        rawDesc.match(/\(.*\d{4}.*–.*\d{4}.*\)/)||
                        false;
+        // extract = first paragraph from Wikipedia article, much richer than description
+        // Trim to 2 sentences max for display
+        const rawExtract=(p.extract||'').replace(/\n.*/s,'').trim();
+        const sentences=rawExtract.match(/[^.!?]+[.!?]+/g)||[];
+        const extract=sentences.slice(0,2).join(' ').trim();
         return {
           year:b.year, age, score, deceased,
-          name:p.title, desc:rawDesc,
+          name:p.title, desc:rawDesc, extract,
           url:p.content_urls&&p.content_urls.desktop?p.content_urls.desktop.page:null
         };
       })
@@ -514,10 +517,11 @@ async function loadBirthdays(){
           <div class="birthday-age" style="${b.deceased?'color:var(--muted)':''}">
             ${b.deceased?'✝':'🎂'}<br/><span style="font-size:13px">${b.age}</span>
           </div>
-          <div>
+          <div style="flex:1">
             <div class="birthday-name">${b.url?`<a href="${b.url}" target="_blank">${cleanName}</a>`:cleanName}</div>
-            <div class="birthday-note" style="color:var(--gold);font-size:12px">${b.desc}</div>
-            <div class="item-meta">Born ${b.year}${b.deceased?' · Passed away':' · Turns '+b.age+' today'}</div>
+            <div class="birthday-note" style="color:var(--gold);font-size:12px;margin-bottom:3px">${b.desc}</div>
+            ${b.extract?`<div class="birthday-note" style="color:var(--text);font-size:12px;line-height:1.5">${b.extract}</div>`:''}
+            <div class="item-meta" style="margin-top:4px">Born ${b.year}${b.deceased?' · Passed away':' · Turns '+b.age+' today'}</div>
           </div>
         </div>`;
       });
