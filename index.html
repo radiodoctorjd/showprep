@@ -411,9 +411,9 @@ async function loadWeather(){
       const dp=DAYPARTS[dpIdx];
       if(isFirst) return 'Now · '+dp.name;
       if(dayOffset===0) return dp.name;
-      if(dayOffset===1) return 'Tmrw · '+dp.short;
+      if(dayOffset===1) return 'Tomorrow · '+dp.name;
       const d=new Date(TODAY); d.setDate(d.getDate()+dayOffset);
-      return d.toLocaleDateString('en-US',{weekday:'short'})+' · '+dp.short;
+      return d.toLocaleDateString('en-US',{weekday:'long'})+' · '+dp.name;
     }
 
     function slotSub(dayOffset, dpIdx){
