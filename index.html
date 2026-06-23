@@ -290,20 +290,31 @@ function fmt(dateStr){
 }
 
 /* ══════════════════════════════════════════
-   WEATHER — Open-Meteo + NWS Alerts
+   WEATHER — Open-Meteo hourly dayparts + NWS Alerts
+   Shows: current daypart + next 4 dayparts
+   Dayparts: Morning (6-11), Afternoon (12-17), Evening (18-21), Overnight (22-5)
 ══════════════════════════════════════════ */
 async function loadWeather(){
   setLoading('body-weather');
   try {
-    const [fRes,aRes]=await Promise.allSettled([
-      fetch('https://api.open-meteo.com/v1/forecast?latitude=44.0153&longitude=-73.1673&daily=temperature_2m_max,temperature_2m_min,weathercode,precipitation_probability_max&temperature_unit=fahrenheit&timezone=America%2FNew_York&forecast_days=5'),
-      fetch('https://api.weather.gov/alerts/active?area=VT',{headers:{'User-Agent':'WVTK-ShowPrep/1.0','Accept':'application/geo+json'}})
+    // Fetch hourly + daily + alerts in parallel
+    const [hRes, aRes] = await Promise.allSettled([
+      fetch('https://api.open-meteo.com/v1/forecast?latitude=44.0153&longitude=-73.1673'
+        +'&hourly=temperature_2m,weathercode,precipitation_probability'
+        +'&daily=temperature_2m_max,temperature_2m_min,weathercode,precipitation_probability_max'
+        +'&temperature_unit=fahrenheit&timezone=America%2FNew_York&forecast_days=4'),
+      fetch('https://api.weather.gov/alerts/active?area=VT',
+        {headers:{'User-Agent':'WVTK-ShowPrep/1.0','Accept':'application/geo+json'}})
     ]);
 
-    if(fRes.status==='rejected') throw new Error('Weather API unavailable');
-    const fData=await fRes.value.json();
-    const d=fData.daily;
+    if(hRes.status==='rejected'||!hRes.value.ok) throw new Error('Weather API unavailable');
+    const data=await hRes.value.json();
+    const hourlyTimes=data.hourly.time;
+    const hourlyTemps=data.hourly.temperature_2m;
+    const hourlyCodes=data.hourly.weathercode;
+    const hourlyPrecip=data.hourly.precipitation_probability;
 
+    // NWS alerts
     let alertHTML='';
     if(aRes.status==='fulfilled'&&aRes.value.ok){
       const aData=await aRes.value.json();
@@ -318,55 +329,120 @@ async function loadWeather(){
       }
     }
 
-    // Also fetch hourly data to get tonight's temp
-    const hourlyUrl='https://api.open-meteo.com/v1/forecast?latitude=44.0153&longitude=-73.1673'
-      +'&hourly=temperature_2m,weathercode&temperature_unit=fahrenheit&timezone=America%2FNew_York&forecast_days=2';
-    let tonightTemp=null, tonightCode=null;
-    try {
-      const hRes=await fetch(hourlyUrl);
-      const hData=await hRes.json();
-      const hours=hData.hourly.time;
-      // Find hours 20-23 (8pm-11pm) today for "tonight"
-      const todayStr=TODAY.toISOString().slice(0,10);
-      const tonightHours=hours.reduce((acc,t,i)=>{
-        if(t.startsWith(todayStr)){
-          const hr=parseInt(t.slice(11,13));
-          if(hr>=20&&hr<=23) acc.push(i);
-        }
-        return acc;
-      },[]);
-      if(tonightHours.length){
-        const temps=tonightHours.map(i=>hData.hourly.temperature_2m[i]);
-        tonightTemp=Math.round(Math.min(...temps));
-        tonightCode=hData.hourly.weathercode[tonightHours[0]];
-      }
-    } catch(e){ /* tonight optional */ }
-
-    // Slots: Today, Tonight, Tomorrow, Day+2, Day+3
-    const slots=[
-      { label:'Today',    sub:shortDate(0), hi:Math.round(d.temperature_2m_max[0]), lo:Math.round(d.temperature_2m_min[0]), code:d.weathercode[0], precip:d.precipitation_probability_max[0], isTonight:false },
-      { label:'Tonight',  sub:'overnight',  hi:null, lo:tonightTemp!==null?tonightTemp:Math.round(d.temperature_2m_min[0]), code:tonightCode!==null?tonightCode:d.weathercode[0], precip:d.precipitation_probability_max[0], isTonight:true },
-      { label:'Tomorrow', sub:shortDate(1), hi:Math.round(d.temperature_2m_max[1]), lo:Math.round(d.temperature_2m_min[1]), code:d.weathercode[1], precip:d.precipitation_probability_max[1], isTonight:false },
-      { label:shortDate(2).split(' ')[0]+' '+shortDate(2).split(' ')[1], sub:shortDate(2), hi:Math.round(d.temperature_2m_max[2]), lo:Math.round(d.temperature_2m_min[2]), code:d.weathercode[2], precip:d.precipitation_probability_max[2], isTonight:false },
-      { label:shortDate(3).split(' ')[0]+' '+shortDate(3).split(' ')[1], sub:shortDate(3), hi:Math.round(d.temperature_2m_max[3]), lo:Math.round(d.temperature_2m_min[3]), code:d.weathercode[3], precip:d.precipitation_probability_max[3], isTonight:false },
+    // Define daypart hour ranges
+    const DAYPARTS=[
+      {name:'Morning',   short:'Morn',  hours:[6,7,8,9,10,11]},
+      {name:'Afternoon', short:'Aftn',  hours:[12,13,14,15,16,17]},
+      {name:'Evening',   short:'Eve',   hours:[18,19,20,21]},
+      {name:'Overnight', short:'Ovnt',  hours:[22,23,0,1,2,3,4,5]},
     ];
 
+    // Get current hour in local time
+    const nowHour=new Date().getHours();
+
+    // Figure out which daypart index we're currently in
+    function getDaypartIndex(hour){
+      if(hour>=6&&hour<=11)  return 0; // Morning
+      if(hour>=12&&hour<=17) return 1; // Afternoon
+      if(hour>=18&&hour<=21) return 2; // Evening
+      return 3;                         // Overnight
+    }
+
+    const currentDaypartIdx=getDaypartIndex(nowHour);
+
+    // Build a flat sequence of {dayOffset, daypartIdx} for current + next 4
+    function buildSlots(){
+      const slots=[];
+      let dayOffset=0;
+      let dpIdx=currentDaypartIdx;
+      while(slots.length<5){
+        slots.push({dayOffset, dpIdx});
+        dpIdx++;
+        if(dpIdx>3){ dpIdx=0; dayOffset++; }
+      }
+      return slots;
+    }
+
+    const slots=buildSlots();
+
+    // For a given slot, find hourly data and compute avg temp, dominant code, avg precip
+    function getSlotData(dayOffset, dpIdx){
+      const dp=DAYPARTS[dpIdx];
+      const targetDate=new Date(TODAY);
+      // Overnight that spans midnight: if hours include 0-5, we need next calendar day for those
+      targetDate.setDate(targetDate.getDate()+dayOffset);
+      const dateStr=targetDate.toISOString().slice(0,10);
+
+      // For overnight, hours 22-23 are on dateStr, hours 0-5 are on dateStr+1
+      const temps=[], codes=[], precips=[];
+      dp.hours.forEach(hr=>{
+        let lookupDate=dateStr;
+        if(dpIdx===3&&hr<=5){
+          // next calendar day
+          const next=new Date(targetDate);
+          next.setDate(next.getDate()+1);
+          lookupDate=next.toISOString().slice(0,10);
+        }
+        const timeStr=`${lookupDate}T${String(hr).padStart(2,'0')}:00`;
+        const idx=hourlyTimes.indexOf(timeStr);
+        if(idx!==-1){
+          if(hourlyTemps[idx]!=null) temps.push(hourlyTemps[idx]);
+          if(hourlyCodes[idx]!=null) codes.push(hourlyCodes[idx]);
+          if(hourlyPrecip[idx]!=null) precips.push(hourlyPrecip[idx]);
+        }
+      });
+
+      if(temps.length===0) return null;
+
+      const avgTemp=Math.round(temps.reduce((a,b)=>a+b,0)/temps.length);
+      const maxTemp=Math.round(Math.max(...temps));
+      const minTemp=Math.round(Math.min(...temps));
+      // Most common weather code
+      const codeFreq={};
+      codes.forEach(c=>{ codeFreq[c]=(codeFreq[c]||0)+1; });
+      const dominantCode=Object.keys(codeFreq).sort((a,b)=>codeFreq[b]-codeFreq[a])[0];
+      const avgPrecip=precips.length?Math.round(precips.reduce((a,b)=>a+b,0)/precips.length):null;
+
+      return {avgTemp, maxTemp, minTemp, dominantCode:parseInt(dominantCode), avgPrecip};
+    }
+
+    // Label for a slot
+    function slotLabel(dayOffset, dpIdx, isFirst){
+      const dp=DAYPARTS[dpIdx];
+      if(isFirst) return 'Now · '+dp.name;
+      if(dayOffset===0) return dp.name;
+      if(dayOffset===1) return 'Tmrw · '+dp.short;
+      const d=new Date(TODAY); d.setDate(d.getDate()+dayOffset);
+      return d.toLocaleDateString('en-US',{weekday:'short'})+' · '+dp.short;
+    }
+
+    function slotSub(dayOffset, dpIdx){
+      const d=new Date(TODAY); d.setDate(d.getDate()+dayOffset);
+      return d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+    }
+
     let html=alertHTML+'<div class="weather-grid">';
-    slots.forEach(s=>{
-      const {emoji,desc}=wmoLabel(s.code);
-      html+=`<div class="weather-day">
-        <div class="day-name">${s.label}</div>
-        <div class="date-sub">${s.sub}</div>
+    slots.forEach((s,i)=>{
+      const sd=getSlotData(s.dayOffset, s.dpIdx);
+      if(!sd){ return; }
+      const {emoji,desc}=wmoLabel(sd.dominantCode);
+      const isOvernight=s.dpIdx===3;
+      const label=slotLabel(s.dayOffset, s.dpIdx, i===0);
+      const sub=slotSub(s.dayOffset, s.dpIdx);
+
+      html+=`<div class="weather-day"${i===0?' style="border-color:var(--gold)"':''}>
+        <div class="day-name" style="${i===0?'color:#fff':''}">${label}</div>
+        <div class="date-sub">${sub}</div>
         <div class="emoji">${emoji}</div>
-        ${s.isTonight
-          ? `<div class="lo" style="font-size:22px;color:#fff">${s.lo}°F</div>`
-          : `<div class="hi">${s.hi}°</div><div class="lo">/ ${s.lo}°F</div>`
+        ${isOvernight
+          ? `<div class="hi">${sd.minTemp}°</div><div class="lo">low</div>`
+          : `<div class="hi">${sd.maxTemp}°</div><div class="lo">/ ${sd.minTemp}°F</div>`
         }
         <div class="desc">${desc}</div>
-        ${s.precip!=null?`<div class="precip">💧 ${s.precip}%</div>`:''}
+        ${sd.avgPrecip!=null?`<div class="precip">💧 ${sd.avgPrecip}%</div>`:''}
       </div>`;
     });
-    html+='</div><div class="source-credit">Open-Meteo.com · NWS Alerts · Middlebury VT (44.02°N 73.17°W)</div>';
+    html+='</div><div class="source-credit">Open-Meteo.com · NWS Alerts · Middlebury VT · Updated hourly</div>';
     document.getElementById('body-weather').innerHTML=html;
   } catch(e){ setError('body-weather',e.message); }
 }
