@@ -677,85 +677,89 @@ async function loadNews(){
 }
 
 /* ══════════════════════════════════════════
-   TRENDING — Reddit r/popular + r/news via JSON API
-   (No CORS issues — Reddit allows direct browser access)
+   TRENDING — Hacker News API + Wikipedia In The News
+   Both are fully CORS-open, no auth needed
 ══════════════════════════════════════════ */
 async function loadTrending(){
   setLoading('body-trending');
   try {
-    // Reddit's JSON API works directly in the browser without CORS issues
-    const [popRes, newsRes, entRes] = await Promise.allSettled([
-      fetch('https://www.reddit.com/r/popular/hot.json?limit=8&raw_json=1', {headers:{'Accept':'application/json'}}),
-      fetch('https://www.reddit.com/r/news/hot.json?limit=5&raw_json=1',    {headers:{'Accept':'application/json'}}),
-      fetch('https://www.reddit.com/r/entertainment/hot.json?limit=5&raw_json=1', {headers:{'Accept':'application/json'}})
+    const mm=String(TODAY.getMonth()+1).padStart(2,'0');
+    const dd=String(TODAY.getDate()).padStart(2,'0');
+    const yyyy=TODAY.getFullYear();
+
+    // Fetch HN top story IDs + Wikipedia featured (In The News) in parallel
+    const [hnRes, wikiRes] = await Promise.allSettled([
+      fetch('https://hacker-news.firebaseio.com/v0/topstories.json'),
+      fetch(`https://en.wikipedia.org/api/rest_v1/feed/featured/${yyyy}/${mm}/${dd}`)
     ]);
 
-    const allTopics=[];
+    const items=[];
 
-    if(popRes.status==='fulfilled'&&popRes.value.ok){
-      const d=await popRes.value.json();
-      (d.data?.children||[]).forEach(c=>{
-        const p=c.data;
-        if(p.title&&!p.stickied) allTopics.push({
-          title:p.title, sub:'r/'+p.subreddit,
-          score:p.score, comments:p.num_comments,
-          url:'https://reddit.com'+p.permalink,
-          category:'TRENDING'
-        });
+    // ── Wikipedia "In The News" ──
+    if(wikiRes.status==='fulfilled'&&wikiRes.value.ok){
+      const d=await wikiRes.value.json();
+      // news items
+      (d.news||[]).slice(0,4).forEach(n=>{
+        const story=n.story||'';
+        // Strip wiki markup links [[...]] to plain text
+        const clean=story.replace(/'{2,3}/g,'').replace(/\[\[([^\]|]+\|)?([^\]]+)\]\]/g,'$2').slice(0,120);
+        const links=n.links||[];
+        const url=links[0]&&links[0].content_urls&&links[0].content_urls.desktop?links[0].content_urls.desktop.page:null;
+        items.push({category:'IN THE NEWS', title:clean+(clean.length>=120?'…':''), url, source:'Wikipedia'});
+      });
+      // most read articles today
+      (d.mostread&&d.mostread.articles||[]).slice(0,5).forEach(a=>{
+        if(a.title==='Main_Page'||a.title==='Special:Search') return;
+        const url=a.content_urls&&a.content_urls.desktop?a.content_urls.desktop.page:null;
+        items.push({category:'MOST READ TODAY', title:a.title.replace(/_/g,' '), url, source:'Wikipedia'});
       });
     }
 
-    if(newsRes.status==='fulfilled'&&newsRes.value.ok){
-      const d=await newsRes.value.json();
-      (d.data?.children||[]).forEach(c=>{
-        const p=c.data;
-        if(p.title&&!p.stickied) allTopics.push({
-          title:p.title, sub:'r/news',
-          score:p.score, comments:p.num_comments,
-          url:'https://reddit.com'+p.permalink,
-          category:'NEWS'
-        });
+    // ── Hacker News top stories ──
+    if(hnRes.status==='fulfilled'&&hnRes.value.ok){
+      const ids=await hnRes.value.json();
+      // Fetch top 8 stories in parallel
+      const storyFetches=ids.slice(0,8).map(id=>
+        fetch(`https://hacker-news.firebaseio.com/v0/item/${id}.json`).then(r=>r.json())
+      );
+      const stories=await Promise.all(storyFetches);
+      stories.forEach(s=>{
+        if(s&&s.title&&s.type==='story'){
+          items.push({
+            category:'TECH & CULTURE',
+            title:s.title,
+            url:s.url||`https://news.ycombinator.com/item?id=${s.id}`,
+            score:s.score,
+            comments:s.descendants||0,
+            source:'Hacker News'
+          });
+        }
       });
     }
 
-    if(entRes.status==='fulfilled'&&entRes.value.ok){
-      const d=await entRes.value.json();
-      (d.data?.children||[]).forEach(c=>{
-        const p=c.data;
-        if(p.title&&!p.stickied) allTopics.push({
-          title:p.title, sub:'r/entertainment',
-          score:p.score, comments:p.num_comments,
-          url:'https://reddit.com'+p.permalink,
-          category:'POP CULTURE'
-        });
+    if(items.length===0) throw new Error('No trending data could be loaded');
+
+    // Tag cloud from most-read titles
+    const tagItems=items.filter(i=>i.category==='MOST READ TODAY');
+    let html='';
+    if(tagItems.length){
+      html+='<div class="tag-cloud" style="margin-bottom:14px">';
+      tagItems.forEach(t=>{
+        html+=`<span class="tag">${t.url?`<a href="${t.url}" target="_blank" style="color:var(--gold);text-decoration:none">${t.title.slice(0,35)}${t.title.length>35?'…':''}</a>`:t.title}</span>`;
       });
+      html+='</div>';
     }
 
-    if(allTopics.length===0) throw new Error('No trending data available');
-
-    // Sort by score, dedupe by similar titles
-    const sorted=allTopics.sort((a,b)=>b.score-a.score).slice(0,12);
-
-    // Tag cloud of topics
-    let html='<div class="tag-cloud" style="margin-bottom:14px">';
-    sorted.slice(0,10).forEach(t=>{
-      // Extract a short keyword from the title
-      const keyword=t.title.split(/[,:.!?—–]/)[0].trim().slice(0,40);
-      html+=`<span class="tag"><a href="${t.url}" target="_blank" style="color:var(--gold);text-decoration:none">${keyword}</a></span>`;
-    });
-    html+='</div>';
-
-    // Top items with detail
-    sorted.slice(0,8).forEach(t=>{
-      const upvotes=t.score>=1000?(t.score/1000).toFixed(1)+'k':t.score;
+    // Full items list
+    items.filter(i=>i.category!=='MOST READ TODAY').forEach(t=>{
       html+=`<div class="item">
-        <div class="item-label">🔥 ${t.category} · ${t.sub}</div>
-        <div class="item-title"><a href="${t.url}" target="_blank">${t.title}</a></div>
-        <div class="item-meta">▲ ${upvotes} upvotes · 💬 ${t.comments} comments</div>
+        <div class="item-label">🔥 ${t.category}</div>
+        <div class="item-title">${t.url?`<a href="${t.url}" target="_blank">${t.title}</a>`:t.title}</div>
+        ${t.score!=null?`<div class="item-meta">▲ ${t.score} points · 💬 ${t.comments} comments · ${t.source}</div>`:`<div class="item-meta">${t.source}</div>`}
       </div>`;
     });
 
-    html+='<div class="source-credit">Source: Reddit r/popular · r/news · r/entertainment</div>';
+    html+='<div class="source-credit">Sources: Wikipedia In The News · Hacker News</div>';
     document.getElementById('body-trending').innerHTML=html;
   } catch(e){ setError('body-trending',e.message); }
 }
