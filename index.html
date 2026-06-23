@@ -25,10 +25,28 @@
     #refresh-all-btn{background:var(--red);color:#fff;border:none;border-radius:6px;font-family:'Oswald',sans-serif;font-size:14px;font-weight:600;padding:8px 18px;cursor:pointer;transition:background .15s}
     #refresh-all-btn:hover{background:#a50d24}
 
-    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;padding:20px 24px;max-width:1600px;margin:0 auto;align-items:start}@media(max-width:900px){.grid{grid-template-columns:repeat(2,1fr)}}@media(max-width:600px){.grid{grid-template-columns:1fr}}
-    .card.wide{grid-column:1/-1}
+    /* Pinterest/masonry layout using CSS columns */
+    .grid{
+      columns:3;
+      column-gap:16px;
+      padding:20px 24px;
+      max-width:1600px;
+      margin:0 auto;
+    }
+    .card{
+      break-inside:avoid;
+      margin-bottom:16px;
+      display:inline-block;
+      width:100%;
+    }
+    .card.wide{
+      column-span:all;
+      display:block;
+    }
+    @media(max-width:1000px){.grid{columns:2}}
+    @media(max-width:600px){.grid{columns:1}}
 
-    .card{background:var(--panel);border:1px solid var(--border);border-radius:10px;overflow:hidden;display:flex;flex-direction:column;height:fit-content}
+    .card{background:var(--panel);border:1px solid var(--border);border-radius:10px;overflow:hidden;display:flex;flex-direction:column}
     .card-header{background:var(--mid);border-bottom:2px solid var(--red);padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:8px}
     .card-title{font-family:'Oswald',sans-serif;font-size:14px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);display:flex;align-items:center;gap:8px}
     .refresh-btn{background:none;border:1px solid var(--border);border-radius:4px;color:var(--muted);font-size:13px;padding:3px 8px;cursor:pointer;transition:color .15s,border-color .15s}
@@ -1063,27 +1081,40 @@ async function loadSports(){
     const yest=new Date(TODAY); yest.setDate(yest.getDate()-1);
     const yesterdayDate=espnDate(yest);
 
+    // Favorite teams filter
+    const FAVS={
+      MLB: ['BOS','NYY','NYM'],
+      NBA: ['NYK','BKN'],
+      NFL: ['NE','NYG','NYJ','BUF'],
+      NHL: ['MTL','BOS','NYR','NYI'],
+    };
+
     const leagues=[
-      {name:'MLB',  sport:'baseball',    league:'mlb'},
-      {name:'NBA',  sport:'basketball',  league:'nba'},
-      {name:'NFL',  sport:'football',    league:'nfl'},
-      {name:'NHL',  sport:'hockey',      league:'nhl'},
+      {name:'MLB',  sport:'baseball',    league:'mlb',       abbrs:FAVS.MLB},
+      {name:'NBA',  sport:'basketball',  league:'nba',       abbrs:FAVS.NBA},
+      {name:'NFL',  sport:'football',    league:'nfl',       abbrs:FAVS.NFL},
+      {name:'NHL',  sport:'hockey',      league:'nhl',       abbrs:FAVS.NHL},
     ];
 
     // Fetch yesterday + today for each league
     const fetches=leagues.flatMap(l=>[
-      fetch(`${base}/${l.sport}/${l.league}/scoreboard?dates=${yesterdayDate}`).then(r=>r.json()).then(d=>({...l,d,when:'yesterday'})),
-      fetch(`${base}/${l.sport}/${l.league}/scoreboard?dates=${todayDate}`).then(r=>r.json()).then(d=>({...l,d,when:'today'})),
+      fetch(`${base}/${l.sport}/${l.league}/scoreboard?dates=${yesterdayDate}&limit=20`).then(r=>r.json()).then(d=>({...l,d,when:'yesterday',abbrs:l.abbrs})),
+      fetch(`${base}/${l.sport}/${l.league}/scoreboard?dates=${todayDate}&limit=20`).then(r=>r.json()).then(d=>({...l,d,when:'today',abbrs:l.abbrs})),
     ]);
     const results=await Promise.allSettled(fetches);
 
-    // Group by league
+    // Group by league, filtering to favorite teams only
     const byLeague={};
-    leagues.forEach(l=>{ byLeague[l.name]={yesterday:[],today:[]}; });
+    leagues.forEach(l=>{ byLeague[l.name]={yesterday:[],today:[],abbrs:l.abbrs}; });
     results.forEach(r=>{
       if(r.status!=='fulfilled') return;
-      const {name,d,when}=r.value;
-      (d.events||[]).forEach(ev=>byLeague[name][when].push(ev));
+      const {name,d,when,abbrs}=r.value;
+      (d.events||[]).forEach(ev=>{
+        const teams=(ev.competitions?.[0]?.competitors||[])
+          .map(t=>t.team?.abbreviation||'');
+        const isFav=teams.some(a=>abbrs.includes(a));
+        if(isFav) byLeague[name][when].push(ev);
+      });
     });
 
     function renderGame(ev, isYesterday){
@@ -1127,14 +1158,17 @@ async function loadSports(){
       html+=`<div style="margin-bottom:12px">
         <div class="item-label" style="margin-bottom:6px">🏆 ${l.name}</div>`;
 
+      // MLB has up to 15 games per day, others typically 5-8
+      const maxGames=l.name==='MLB'?16:8;
+
       if(yGames.length>0){
         html+=`<div style="font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:3px">${yest.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})} — Final Scores</div>`;
-        yGames.slice(0,5).forEach(ev=>{ html+=renderGame(ev,true); });
+        yGames.slice(0,maxGames).forEach(ev=>{ html+=renderGame(ev,true); });
       }
 
       if(tGames.length>0){
         html+=`<div style="font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin:6px 0 3px">Today's Schedule</div>`;
-        tGames.slice(0,5).forEach(ev=>{ html+=renderGame(ev,false); });
+        tGames.slice(0,maxGames).forEach(ev=>{ html+=renderGame(ev,false); });
       }
 
       html+='</div>';
@@ -1155,16 +1189,13 @@ async function loadDailyExtras(){
     function fmtTime(utcStr){
       return new Date(utcStr).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',timeZone:'America/New_York'});
     }
-    function ballHTML(nums, special, specialColor){
-      const bs=`display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:var(--mid);border:1px solid var(--border);font-family:'Oswald',sans-serif;font-size:13px;font-weight:600;margin:2px;color:#fff`;
-      const ss=`display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:${specialColor};font-family:'Oswald',sans-serif;font-size:13px;font-weight:600;margin:2px;color:#fff`;
-      return nums.map(n=>`<span style="${bs}">${n}</span>`).join('')
-        +(special!=null?`<span style="${ss}">${special}</span>`:'');
-    }
-    function fmtJackpot(n){
-      if(!n) return 'TBD';
-      const m=Math.round(n/1000000);
-      return m>=1?'$'+m+'M':'$'+n.toLocaleString();
+    // NY Open Data Powerball: winning_numbers = "01 02 03 04 05 06" (first 5 = white balls, 6th = powerball)
+    // NY Open Data Mega Millions: winning_numbers = "01 02 03 04 05 06" (first 5 = white balls, 6th = mega ball)
+    function ballHTML(whites, special, specialColor){
+      const bs=`display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;background:var(--mid);border:2px solid var(--border);font-family:'Oswald',sans-serif;font-size:13px;font-weight:700;margin:2px;color:#fff`;
+      const ss=`display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;background:${specialColor};border:2px solid transparent;font-family:'Oswald',sans-serif;font-size:13px;font-weight:700;margin:2px 2px 2px 6px;color:#fff`;
+      return whites.map(n=>`<span style="${bs}">${String(n).padStart(2,'0')}</span>`).join('')
+        +(special?`<span style="${ss}">${String(special).padStart(2,'0')}</span>`:'');
     }
 
     let html='';
@@ -1202,123 +1233,74 @@ async function loadDailyExtras(){
                 <div style="font-family:'Oswald',sans-serif;font-size:16px;color:#60A5FA">${dusk}</div>
               </div>
             </div>
-            <div class="item-meta" style="margin-top:6px">Day length: ${hrs}h ${mins}m · sunrise-sunset.org</div>
+            <div class="item-meta" style="margin-top:6px">Day length: ${hrs}h ${mins}m</div>
           </div>`;
         }
       }
     } catch(e){}
 
-    // ── Lottery Numbers & Jackpots ──
-    // Use powerball.com and megamillions.com JSON feeds directly
-    html+=`<div class="item"><div class="item-label">🎟 Lottery — Last Night's Numbers &amp; Jackpots</div>`;
+    // ── Lottery — NY Open Data (most reliable, always has latest draw) ──
+    html+=`<div class="item"><div class="item-label">🎟 Lottery — Most Recent Winning Numbers</div>`;
 
-    const [pbRes, mmRes, mbRes] = await Promise.allSettled([
-      fetch('https://www.powerball.com/api/v1/numbers/powerball/recent?count=1'),
-      fetch('https://www.megamillions.com/cmspages/utilservice.asmx/GetLatestMegaMillionsNumbers'),
-      fetch('https://www.megabucks.com/api/latest') // Tri-State Megabucks fallback
-    ]);
-
-    // Powerball
-    try {
-      if(pbRes.status==='fulfilled'&&pbRes.value.ok){
-        const pbData=await pbRes.value.json();
-        const d=Array.isArray(pbData)?pbData[0]:pbData?.data?.[0];
-        if(d){
-          const nums=(d.field1||d.numbers||'').toString().split(/[\s,]+/).filter(Boolean).slice(0,5);
-          const ball=d.field2||d.powerball||d.special||'';
-          const pp=d.field3||d.powerPlay||'';
-          const drawDate=d.date||d.drawDate||'';
-          const jackpot=d.jackpot||d.nextJackpot||null;
-          const dStr=drawDate?new Date(drawDate).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}):'';
-          html+=`<div style="margin-top:10px">
-            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
-              <div style="font-size:12px;color:var(--muted)">🔴 Powerball · ${dStr}</div>
-              ${jackpot?`<div style="font-family:'Oswald',sans-serif;font-size:14px;color:var(--gold)">Jackpot: ${fmtJackpot(jackpot)}</div>`:''}
-            </div>
-            <div>${ballHTML(nums,ball,'#C8102E')}</div>
-            ${pp?`<div style="font-size:11px;color:var(--muted);margin-top:3px">Power Play: ${pp}x</div>`:''}
-          </div>`;
-        }
-      }
-    } catch(e){}
-
-    // Mega Millions
-    try {
-      if(mmRes.status==='fulfilled'&&mmRes.value.ok){
-        const mmData=await mmRes.value.json();
-        // megamillions returns XML-ish or JSON
-        const d=mmData?.d||mmData?.data||mmData;
-        const numStr=d?.numbers||d?.winning_numbers||'';
-        const nums=numStr.toString().split(/[\s,]+/).filter(Boolean).slice(0,5);
-        const ball=d?.megaBall||d?.mega_ball||d?.special||'';
-        const mp=d?.megaplier||d?.multiplier||'';
-        const drawDate=d?.drawDate||d?.date||'';
-        const jackpot=d?.jackpot||d?.nextJackpot||null;
-        const dStr=drawDate?new Date(drawDate).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}):'';
-        if(nums.length>0){
-          html+=`<div style="margin-top:10px">
-            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
-              <div style="font-size:12px;color:var(--muted)">🔵 Mega Millions · ${dStr}</div>
-              ${jackpot?`<div style="font-family:'Oswald',sans-serif;font-size:14px;color:var(--gold)">Jackpot: ${fmtJackpot(jackpot)}</div>`:''}
-            </div>
-            <div>${ballHTML(nums,ball,'#003DA5')}</div>
-            ${mp?`<div style="font-size:11px;color:var(--muted);margin-top:3px">Megaplier: ${mp}x</div>`:''}
-          </div>`;
-        }
-      }
-    } catch(e){}
-
-    // NY Open Data fallback for both PB and MM (most reliable, always latest draw)
     const [nyPbRes, nyMmRes] = await Promise.allSettled([
-      fetch('https://data.ny.gov/resource/d6yy-54nr.json?$limit=2&$order=draw_date+DESC'),
-      fetch('https://data.ny.gov/resource/5xaw-6ayf.json?$limit=2&$order=draw_date+DESC'),
+      fetch('https://data.ny.gov/resource/d6yy-54nr.json?$limit=1&$order=draw_date+DESC'),
+      fetch('https://data.ny.gov/resource/5xaw-6ayf.json?$limit=1&$order=draw_date+DESC'),
     ]);
 
-    // If powerball section empty, use NY data
-    const pbEmpty=!html.includes('Powerball');
-    const mmEmpty=!html.includes('Mega Millions');
-
-    if(pbEmpty&&nyPbRes.status==='fulfilled'&&nyPbRes.value.ok){
+    // Powerball — field names: draw_date, winning_numbers ("n1 n2 n3 n4 n5 pb"), multiplier
+    if(nyPbRes.status==='fulfilled'&&nyPbRes.value.ok){
       const rows=await nyPbRes.value.json();
       if(rows.length>0){
         const row=rows[0];
-        const parts=(row.winning_numbers||'').split(' ');
-        const nums=parts.slice(0,5);
-        const ball=parts[5]||'';
-        const mp=row.multiplier||'';
-        const dStr=row.draw_date?new Date(row.draw_date).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}):'';
+        const parts=(row.winning_numbers||'').trim().split(/\s+/);
+        const whites=parts.slice(0,5);
+        const pb=parts[5]||'';
+        const pp=row.multiplier||'';
+        const dStr=row.draw_date?new Date(row.draw_date).toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric',year:'numeric'}):'';
         html+=`<div style="margin-top:10px">
-          <div style="font-size:12px;color:var(--muted);margin-bottom:4px">🔴 Powerball · ${dStr}</div>
-          <div>${ballHTML(nums,ball,'#C8102E')}</div>
-          ${mp?`<div style="font-size:11px;color:var(--muted);margin-top:3px">Power Play: ${mp}x</div>`:''}
+          <div style="font-size:12px;font-weight:600;color:#fff;margin-bottom:2px">🔴 Powerball</div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:5px">${dStr}${pp?' · Power Play: '+pp+'x':''}</div>
+          <div>${ballHTML(whites,pb,'#C8102E')}</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:4px">
+            White balls &nbsp;·&nbsp; <span style="color:#C8102E">■</span> Powerball
+          </div>
         </div>`;
       }
     }
-    if(mmEmpty&&nyMmRes.status==='fulfilled'&&nyMmRes.value.ok){
+
+    // Mega Millions — field names: draw_date, winning_numbers ("n1 n2 n3 n4 n5 mb"), multiplier
+    if(nyMmRes.status==='fulfilled'&&nyMmRes.value.ok){
       const rows=await nyMmRes.value.json();
       if(rows.length>0){
         const row=rows[0];
-        const parts=(row.winning_numbers||'').split(' ');
-        const nums=parts.slice(0,5);
-        const ball=parts[5]||'';
+        const parts=(row.winning_numbers||'').trim().split(/\s+/);
+        const whites=parts.slice(0,5);
+        const mb=parts[5]||'';
         const mp=row.multiplier||'';
-        const dStr=row.draw_date?new Date(row.draw_date).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}):'';
-        html+=`<div style="margin-top:10px">
-          <div style="font-size:12px;color:var(--muted);margin-bottom:4px">🔵 Mega Millions · ${dStr}</div>
-          <div>${ballHTML(nums,ball,'#003DA5')}</div>
-          ${mp?`<div style="font-size:11px;color:var(--muted);margin-top:3px">Megaplier: ${mp}x</div>`:''}
+        const dStr=row.draw_date?new Date(row.draw_date).toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric',year:'numeric'}):'';
+        html+=`<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
+          <div style="font-size:12px;font-weight:600;color:#fff;margin-bottom:2px">🔵 Mega Millions</div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:5px">${dStr}${mp?' · Megaplier: '+mp+'x':''}</div>
+          <div>${ballHTML(whites,mb,'#003DA5')}</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:4px">
+            White balls &nbsp;·&nbsp; <span style="color:#003DA5">■</span> Mega Ball
+          </div>
         </div>`;
       }
     }
 
-    // Tri-State Megabucks — vtlottery.com link (no public API)
-    html+=`<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border)">
-      <div style="font-size:12px;color:var(--muted);margin-bottom:4px">🟢 Tri-State Megabucks</div>
-      <div style="font-size:13px;color:var(--text)">Check latest numbers at <a href="https://vtlottery.com/games/megabucks-doubler" target="_blank" style="color:var(--gold)">vtlottery.com →</a></div>
+    // Jackpot estimates — link to official sites since no free API has live jackpots
+    html+=`<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
+      <div style="font-size:11px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">Next Jackpot Estimates</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <a href="https://www.powerball.com" target="_blank" style="background:var(--mid);border:1px solid var(--border);border-radius:6px;padding:6px 10px;text-decoration:none;font-size:12px;color:var(--text)">🔴 Powerball →</a>
+        <a href="https://www.megamillions.com" target="_blank" style="background:var(--mid);border:1px solid var(--border);border-radius:6px;padding:6px 10px;text-decoration:none;font-size:12px;color:var(--text)">🔵 Mega Millions →</a>
+        <a href="https://vtlottery.com/games/megabucks-doubler" target="_blank" style="background:var(--mid);border:1px solid var(--border);border-radius:6px;padding:6px 10px;text-decoration:none;font-size:12px;color:var(--text)">🟢 Megabucks →</a>
+      </div>
     </div>`;
 
-    html+=`<div class="item-meta" style="margin-top:8px">Sources: NY Open Data · <a href="https://vtlottery.com" target="_blank" style="color:var(--gold)">vtlottery.com</a></div></div>`;
-    html+='<div class="source-credit">Sources: sunrise-sunset.org · NY Open Data · vtlottery.com</div>';
+    html+=`<div class="item-meta" style="margin-top:8px">Numbers: NY Open Data · Jackpots: official lottery sites</div></div>`;
+    html+='<div class="source-credit">Sources: sunrise-sunset.org · data.ny.gov</div>';
     document.getElementById('body-extras').innerHTML=html;
   } catch(e){ setError('body-extras',e.message); }
 }
