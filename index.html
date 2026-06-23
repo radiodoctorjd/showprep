@@ -12,7 +12,7 @@
       --green:#3CBA6E; --on-air:#FF3B30;
     }
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-    body{background:var(--dark);color:var(--text);font-family:'Source Sans 3',sans-serif;font-size:15px;line-height:1.55;min-height:100vh}
+    body{background:var(--dark);color:var(--text);font-family:'Source Sans 3',sans-serif;font-size:16px;line-height:1.65;min-height:100vh}
 
     header{background:var(--mid);border-bottom:3px solid var(--red);padding:0 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;min-height:64px}
     .header-left{display:flex;align-items:center;gap:16px}
@@ -28,14 +28,14 @@
     /* Pinterest/masonry layout using CSS columns */
     .grid{
       columns:3;
-      column-gap:16px;
+      column-gap:18px;
       padding:20px 24px;
       max-width:1600px;
       margin:0 auto;
     }
     .card{
       break-inside:avoid;
-      margin-bottom:16px;
+      margin-bottom:18px;
       display:inline-block;
       width:100%;
     }
@@ -47,11 +47,11 @@
     @media(max-width:600px){.grid{columns:1}}
 
     .card{background:var(--panel);border:1px solid var(--border);border-radius:10px;overflow:hidden;display:flex;flex-direction:column}
-    .card-header{background:var(--mid);border-bottom:2px solid var(--red);padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:8px}
-    .card-title{font-family:'Oswald',sans-serif;font-size:14px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);display:flex;align-items:center;gap:8px}
+    .card-header{background:var(--mid);border-bottom:2px solid var(--red);padding:13px 20px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+    .card-title{font-family:'Oswald',sans-serif;font-size:16px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);display:flex;align-items:center;gap:8px}
     .refresh-btn{background:none;border:1px solid var(--border);border-radius:4px;color:var(--muted);font-size:13px;padding:3px 8px;cursor:pointer;transition:color .15s,border-color .15s}
     .refresh-btn:hover{color:var(--gold);border-color:var(--gold)}
-    .card-body{padding:14px 16px}
+    .card-body{padding:18px 20px}
     
     
 
@@ -62,61 +62,61 @@
 
     /* WEATHER */
     .weather-grid{display:flex;flex-wrap:wrap;gap:10px}
-    .weather-day{background:var(--mid);border:1px solid var(--border);border-radius:8px;padding:10px 14px;min-width:110px;text-align:center;flex:1}
-    .weather-day .day-name{font-family:'Oswald',sans-serif;font-size:12px;color:var(--gold);letter-spacing:1px;text-transform:uppercase;margin-bottom:2px}
-    .weather-day .date-sub{font-size:10px;color:var(--muted);margin-bottom:6px}
-    .weather-day .emoji{font-size:24px;margin-bottom:4px}
-    .weather-day .hi{font-family:'Oswald',sans-serif;font-size:22px;font-weight:700;color:#fff}
-    .weather-day .lo{font-family:'Oswald',sans-serif;font-size:13px;color:var(--muted)}
-    .weather-day .desc{font-size:11px;color:var(--muted);margin-top:3px}
-    .weather-day .precip{font-size:11px;color:#60A5FA;margin-top:2px}
+    .weather-day{background:var(--mid);border:1px solid var(--border);border-radius:10px;padding:14px 16px;min-width:110px;text-align:center;flex:1}
+    .weather-day .day-name{font-family:'Oswald',sans-serif;font-size:13px;color:var(--gold);letter-spacing:1px;text-transform:uppercase;margin-bottom:3px}
+    .weather-day .date-sub{font-size:11px;color:var(--muted);margin-bottom:8px}
+    .weather-day .emoji{font-size:28px;margin-bottom:6px}
+    .weather-day .hi{font-family:'Oswald',sans-serif;font-size:26px;font-weight:700;color:#fff}
+    .weather-day .lo{font-family:'Oswald',sans-serif;font-size:14px;color:var(--muted)}
+    .weather-day .desc{font-size:12px;color:var(--muted);margin-top:4px}
+    .weather-day .precip{font-size:12px;color:#60A5FA;margin-top:4px}
     .weather-alert{background:#3B1515;border:1px solid var(--red);border-radius:6px;padding:8px 12px;font-size:13px;color:#FCA5A5;margin-bottom:12px;line-height:1.5}
 
     /* ITEMS */
-    .item{border-bottom:1px solid var(--border);padding:10px 0}
+    .item{border-bottom:1px solid var(--border);padding:14px 0}
     .item:last-child{border-bottom:none}
-    .item-label{font-family:'Oswald',sans-serif;font-size:11px;color:var(--red);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:3px}
-    .item-title{font-weight:600;font-size:14px;color:#fff;margin-bottom:2px;line-height:1.4}
-    .item-title a{color:#fff;text-decoration:none}
-    .item-title a:hover{color:var(--gold);text-decoration:underline}
-    .item-body{font-size:13px;color:var(--muted);line-height:1.5}
-    .item-meta{font-family:'Courier Prime',monospace;font-size:10px;color:var(--border);margin-top:4px;letter-spacing:.5px}
+    .item-label{font-family:'Oswald',sans-serif;font-size:12px;color:var(--red);letter-spacing:1.2px;text-transform:uppercase;margin-bottom:5px}
+    .item-title{font-weight:600;font-size:15px;color:#fff;margin-bottom:4px;line-height:1.5}
+    .item-title a{color:#E8C97A;text-decoration:none}
+    .item-title a:hover{color:#fff;text-decoration:underline}
+    .item-body{font-size:14px;color:var(--muted);line-height:1.6}
+    .item-meta{font-family:'Courier Prime',monospace;font-size:11px;color:var(--border);margin-top:5px;letter-spacing:.5px}
 
     /* BIRTHDAYS */
-    .birthday-list{display:flex;flex-direction:column;gap:8px}
-    .birthday-row{display:flex;align-items:flex-start;gap:12px;background:var(--mid);border-radius:6px;padding:8px 12px}
-    .birthday-age{font-family:'Oswald',sans-serif;font-size:20px;font-weight:700;color:var(--gold);min-width:36px;text-align:center;line-height:1;padding-top:2px}
-    .birthday-name{font-weight:600;font-size:14px;color:#fff}
-    .birthday-name a{color:#fff;text-decoration:none}
+    .birthday-list{display:flex;flex-direction:column;gap:10px}
+    .birthday-row{display:flex;align-items:flex-start;gap:14px;background:var(--mid);border-radius:8px;padding:12px 14px}
+    .birthday-age{font-family:'Oswald',sans-serif;font-size:22px;font-weight:700;color:var(--gold);min-width:40px;text-align:center;line-height:1;padding-top:2px}
+    .birthday-name{font-weight:600;font-size:15px;color:#fff;margin-bottom:2px}
+    .birthday-name a{color:#E8C97A;text-decoration:none}
     .birthday-name a:hover{color:var(--gold)}
-    .birthday-note{font-size:12px;color:var(--muted)}
+    .birthday-note{font-size:13px;color:var(--muted);line-height:1.5}
 
     /* EVENTS */
-    .event-item{border-left:3px solid var(--gold);padding:6px 0 6px 12px;margin-bottom:10px}
-    .event-date{font-family:'Courier Prime',monospace;font-size:11px;color:var(--gold);text-transform:uppercase;letter-spacing:1px}
-    .event-name{font-weight:600;font-size:14px;color:#fff}
-    .event-name a{color:#fff;text-decoration:none}
-    .event-name a:hover{color:var(--gold);text-decoration:underline}
+    .event-item{border-left:3px solid var(--gold);padding:8px 0 8px 14px;margin-bottom:14px}
+    .event-date{font-family:'Courier Prime',monospace;font-size:12px;color:var(--gold);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px}
+    .event-name{font-weight:600;font-size:15px;color:#fff;margin-bottom:3px}
+    .event-name a{color:#E8C97A;text-decoration:none}
+    .event-name a:hover{color:#fff;text-decoration:underline}
     .event-detail{font-size:12px;color:var(--muted);margin-top:2px}
-    .sources-bar{margin-top:14px;padding-top:10px;border-top:1px solid var(--border);font-size:11px;color:var(--muted)}
+    .sources-bar{margin-top:16px;padding-top:12px;border-top:1px solid var(--border);font-size:12px;color:var(--muted)}
     .sources-bar a{color:var(--gold);text-decoration:none}
     .sources-bar a:hover{text-decoration:underline}
 
     /* HEADLINES */
     .headline-row{display:flex;gap:10px;border-bottom:1px solid var(--border);padding:8px 0;align-items:flex-start}
     .headline-num{font-family:'Oswald',sans-serif;font-size:20px;color:var(--red);font-weight:700;min-width:28px;line-height:1;padding-top:2px}
-    .headline-text{font-size:13px;color:var(--text);line-height:1.45}
-    .headline-text a{color:var(--text);text-decoration:none}
-    .headline-text a:hover{color:var(--gold);text-decoration:underline}
+    .headline-text{font-size:15px;color:var(--text);line-height:1.55}
+    .headline-text a{color:#E8C97A;text-decoration:none}
+    .headline-text a:hover{color:#fff;text-decoration:underline}
 
     /* TRENDING */
     .tag-cloud{display:flex;flex-wrap:wrap;gap:8px}
-    .tag{background:var(--mid);border:1px solid var(--red);border-radius:20px;padding:5px 12px;font-size:13px;color:var(--gold)}
+    .tag{background:var(--mid);border:1px solid var(--red);border-radius:20px;padding:6px 14px;font-size:14px;color:var(--gold)}
 
     /* FACTS */
-    .fact-box{background:var(--mid);border-left:4px solid var(--gold);border-radius:0 8px 8px 0;padding:12px 14px;font-size:14px;color:var(--text);line-height:1.6;margin-bottom:10px}
+    .fact-box{background:var(--mid);border-left:4px solid var(--gold);border-radius:0 8px 8px 0;padding:14px 16px;font-size:15px;color:var(--text);line-height:1.7;margin-bottom:12px}
 
-    .source-credit{font-size:10px;color:var(--border);font-family:'Courier Prime',monospace;margin-top:10px;padding-top:8px;border-top:1px solid var(--border)}
+    .source-credit{font-size:11px;color:var(--muted);font-family:'Courier Prime',monospace;margin-top:12px;padding-top:10px;border-top:1px solid var(--border)}
 
     footer{text-align:center;padding:18px;color:var(--border);font-family:'Courier Prime',monospace;font-size:11px;letter-spacing:1px;border-top:1px solid var(--border);margin-top:8px}
     footer span{color:var(--red)}
