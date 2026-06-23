@@ -636,26 +636,26 @@ async function loadMusicNews(){
 async function loadNews(){
   setLoading('body-news');
   try {
-    const [nprRes,vtRes]=await Promise.allSettled([
-      fetchRSS('https://feeds.npr.org/1001/rss.xml'),
+    const [wcaxRes,vtRes]=await Promise.allSettled([
+      fetchRSS('https://www.wcax.com/rss/'),
       fetchRSS('https://vtdigger.org/feed/')
     ]);
 
     const items=[];
 
-    if(nprRes.status==='fulfilled'){
-      Array.from(nprRes.value.querySelectorAll('item')).slice(0,6).forEach(item=>{
+    if(wcaxRes.status==='fulfilled'){
+      Array.from(wcaxRes.value.querySelectorAll('item')).slice(0,6).forEach(item=>{
         items.push({
           title:strip(item.querySelector('title')?.textContent||''),
           link:item.querySelector('link')?.textContent?.trim()||item.querySelector('guid')?.textContent?.trim()||'',
           date:fmt(item.querySelector('pubDate')?.textContent||''),
-          source:'NPR'
+          source:'WCAX'
         });
       });
     }
 
     if(vtRes.status==='fulfilled'){
-      Array.from(vtRes.value.querySelectorAll('item')).slice(0,3).forEach(item=>{
+      Array.from(vtRes.value.querySelectorAll('item')).slice(0,4).forEach(item=>{
         items.push({
           title:strip(item.querySelector('title')?.textContent||''),
           link:item.querySelector('link')?.textContent?.trim()||item.querySelector('guid')?.textContent?.trim()||'',
@@ -677,7 +677,7 @@ async function loadNews(){
         </div>
       </div>`;
     });
-    html+='<div class="source-credit">Sources: NPR News · VT Digger</div>';
+    html+='<div class="source-credit">Sources: WCAX · VT Digger</div>';
     document.getElementById('body-news').innerHTML=html;
   } catch(e){ setError('body-news',e.message); }
 }
