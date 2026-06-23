@@ -25,10 +25,18 @@
     #refresh-all-btn{background:var(--red);color:#fff;border:none;border-radius:6px;font-family:'Oswald',sans-serif;font-size:14px;font-weight:600;padding:8px 18px;cursor:pointer;transition:background .15s}
     #refresh-all-btn:hover{background:#a50d24}
 
-    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px;padding:20px 24px;max-width:1600px;margin:0 auto;align-items:start}
+    .grid{display:grid;grid-template-columns:repeat(12,1fr);grid-auto-rows:auto;gap:14px;padding:20px 24px;max-width:1600px;margin:0 auto;align-items:start}
     .card.wide{grid-column:1/-1}
+    .col-12{grid-column:span 12}
+    .col-8{grid-column:span 8}
+    .col-6{grid-column:span 6}
+    .col-5{grid-column:span 5}
+    .col-4{grid-column:span 4}
+    .col-3{grid-column:span 3}
+    .col-7{grid-column:span 7}
+    @media(max-width:900px){.col-8,.col-7,.col-6,.col-5,.col-4,.col-3{grid-column:span 12}}
 
-    .card{background:var(--panel);border:1px solid var(--border);border-radius:10px;overflow:hidden;display:flex;flex-direction:column;height:fit-content}
+    .card{background:var(--panel);border:1px solid var(--border);border-radius:10px;overflow:hidden;display:flex;flex-direction:column;align-self:start}
     .card-header{background:var(--mid);border-bottom:2px solid var(--red);padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:8px}
     .card-title{font-family:'Oswald',sans-serif;font-size:14px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);display:flex;align-items:center;gap:8px}
     .refresh-btn{background:none;border:1px solid var(--border);border-radius:4px;color:var(--muted);font-size:13px;padding:3px 8px;cursor:pointer;transition:color .15s,border-color .15s}
@@ -122,7 +130,8 @@
 
 <div class="grid">
 
-  <div class="card wide">
+  <!-- ROW 1: Weather full width -->
+  <div class="card col-12">
     <div class="card-header">
       <div class="card-title">🌤 Middlebury, VT — Weather Forecast</div>
       <button class="refresh-btn" onclick="loadWeather()">↻ Refresh</button>
@@ -130,39 +139,8 @@
     <div class="card-body" id="body-weather"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
   </div>
 
-  <div class="card">
-    <div class="card-header">
-      <div class="card-title">📅 Today in History</div>
-      <button class="refresh-btn" onclick="loadHistory()">↻ Refresh</button>
-    </div>
-    <div class="card-body" id="body-history"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
-  </div>
-
-  <div class="card">
-    <div class="card-header">
-      <div class="card-title">🎂 Celebrity Birthdays Today</div>
-      <button class="refresh-btn" onclick="loadBirthdays()">↻ Refresh</button>
-    </div>
-    <div class="card-body" id="body-birthdays"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
-  </div>
-
-  <div class="card">
-    <div class="card-header">
-      <div class="card-title">📌 Community Calendar</div>
-      <button class="refresh-btn" onclick="loadEvents()">↻ Refresh</button>
-    </div>
-    <div class="card-body" id="body-events"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
-  </div>
-
-  <div class="card">
-    <div class="card-header">
-      <div class="card-title">🎸 Music News</div>
-      <button class="refresh-btn" onclick="loadMusicNews()">↻ Refresh</button>
-    </div>
-    <div class="card-body" id="body-musicnews"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
-  </div>
-
-  <div class="card">
+  <!-- ROW 2: News (wide) + Facts (narrow) -->
+  <div class="card col-8">
     <div class="card-header">
       <div class="card-title">📰 Top News Headlines</div>
       <button class="refresh-btn" onclick="loadNews()">↻ Refresh</button>
@@ -170,7 +148,32 @@
     <div class="card-body" id="body-news"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
   </div>
 
-  <div class="card">
+  <div class="card col-4">
+    <div class="card-header">
+      <div class="card-title">💡 Random Facts</div>
+      <button class="refresh-btn" onclick="loadFacts()">↻ Refresh</button>
+    </div>
+    <div class="card-body" id="body-facts"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
+  </div>
+
+  <!-- ROW 3: History + Birthdays + Trending -->
+  <div class="card col-4">
+    <div class="card-header">
+      <div class="card-title">📅 Today in History</div>
+      <button class="refresh-btn" onclick="loadHistory()">↻ Refresh</button>
+    </div>
+    <div class="card-body" id="body-history"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
+  </div>
+
+  <div class="card col-4">
+    <div class="card-header">
+      <div class="card-title">🎂 Celebrity Birthdays Today</div>
+      <button class="refresh-btn" onclick="loadBirthdays()">↻ Refresh</button>
+    </div>
+    <div class="card-body" id="body-birthdays"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
+  </div>
+
+  <div class="card col-4">
     <div class="card-header">
       <div class="card-title">🔥 What's Trending</div>
       <button class="refresh-btn" onclick="loadTrending()">↻ Refresh</button>
@@ -178,12 +181,21 @@
     <div class="card-body" id="body-trending"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
   </div>
 
-  <div class="card">
+  <!-- ROW 4: Music News (wide) + Community Calendar (narrow) -->
+  <div class="card col-7">
     <div class="card-header">
-      <div class="card-title">💡 Random Facts</div>
-      <button class="refresh-btn" onclick="loadFacts()">↻ Refresh</button>
+      <div class="card-title">🎸 Music News</div>
+      <button class="refresh-btn" onclick="loadMusicNews()">↻ Refresh</button>
     </div>
-    <div class="card-body" id="body-facts"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
+    <div class="card-body" id="body-musicnews"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
+  </div>
+
+  <div class="card col-5">
+    <div class="card-header">
+      <div class="card-title">📌 Community Calendar</div>
+      <button class="refresh-btn" onclick="loadEvents()">↻ Refresh</button>
+    </div>
+    <div class="card-body" id="body-events"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
   </div>
 
 </div>
