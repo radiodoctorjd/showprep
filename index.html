@@ -122,6 +122,7 @@
 
 <div class="grid">
 
+  <!-- Weather: full width -->
   <div class="card wide">
     <div class="card-header">
       <div class="card-title">🌤 Middlebury, VT — Weather Forecast</div>
@@ -130,6 +131,7 @@
     <div class="card-body" id="body-weather"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
   </div>
 
+  <!-- Col 1: Today in History + Celebrity Birthdays -->
   <div class="card">
     <div class="card-header">
       <div class="card-title">📅 Today in History</div>
@@ -138,14 +140,16 @@
     <div class="card-body" id="body-history"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
   </div>
 
+  <!-- Col 2: Local News + Music News -->
   <div class="card">
     <div class="card-header">
-      <div class="card-title">🎂 Celebrity Birthdays Today</div>
-      <button class="refresh-btn" onclick="loadBirthdays()">↻ Refresh</button>
+      <div class="card-title">📰 Local News</div>
+      <button class="refresh-btn" onclick="loadNews()">↻ Refresh</button>
     </div>
-    <div class="card-body" id="body-birthdays"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
+    <div class="card-body" id="body-news"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
   </div>
 
+  <!-- Col 3: Community Calendar -->
   <div class="card">
     <div class="card-header">
       <div class="card-title">📌 Community Calendar</div>
@@ -154,6 +158,16 @@
     <div class="card-body" id="body-events"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
   </div>
 
+  <!-- Col 1 continued: Celebrity Birthdays -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">🎂 Celebrity Birthdays Today</div>
+      <button class="refresh-btn" onclick="loadBirthdays()">↻ Refresh</button>
+    </div>
+    <div class="card-body" id="body-birthdays"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
+  </div>
+
+  <!-- Col 2 continued: Music News -->
   <div class="card">
     <div class="card-header">
       <div class="card-title">🎸 Music News</div>
@@ -162,14 +176,7 @@
     <div class="card-body" id="body-musicnews"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
   </div>
 
-  <div class="card">
-    <div class="card-header">
-      <div class="card-title">📰 Top News Headlines</div>
-      <button class="refresh-btn" onclick="loadNews()">↻ Refresh</button>
-    </div>
-    <div class="card-body" id="body-news"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
-  </div>
-
+  <!-- What's Trending -->
   <div class="card">
     <div class="card-header">
       <div class="card-title">🔥 What's Trending</div>
@@ -178,6 +185,7 @@
     <div class="card-body" id="body-trending"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
   </div>
 
+  <!-- Random Facts -->
   <div class="card">
     <div class="card-header">
       <div class="card-title">💡 Random Facts</div>
@@ -329,61 +337,12 @@ async function loadWeather(){
       }
     }
 
-    // Define daypart hour ranges
-    const DAYPARTS=[
-      {name:'Morning',   short:'Morn',  hours:[6,7,8,9,10,11]},
-      {name:'Afternoon', short:'Aftn',  hours:[12,13,14,15,16,17]},
-      {name:'Evening',   short:'Eve',   hours:[18,19,20,21]},
-      {name:'Overnight', short:'Ovnt',  hours:[22,23,0,1,2,3,4,5]},
-    ];
-
-    // Get current hour in local time
-    const nowHour=new Date().getHours();
-
-    // Figure out which daypart index we're currently in
-    function getDaypartIndex(hour){
-      if(hour>=6&&hour<=11)  return 0; // Morning
-      if(hour>=12&&hour<=17) return 1; // Afternoon
-      if(hour>=18&&hour<=21) return 2; // Evening
-      return 3;                         // Overnight
-    }
-
-    const currentDaypartIdx=getDaypartIndex(nowHour);
-
-    // Build a flat sequence of {dayOffset, daypartIdx} for current + next 4
-    function buildSlots(){
-      const slots=[];
-      let dayOffset=0;
-      let dpIdx=currentDaypartIdx;
-      while(slots.length<5){
-        slots.push({dayOffset, dpIdx});
-        dpIdx++;
-        if(dpIdx>3){ dpIdx=0; dayOffset++; }
-      }
-      return slots;
-    }
-
-    const slots=buildSlots();
-
-    // For a given slot, find hourly data and compute avg temp, dominant code, avg precip
-    function getSlotData(dayOffset, dpIdx){
-      const dp=DAYPARTS[dpIdx];
-      const targetDate=new Date(TODAY);
-      // Overnight that spans midnight: if hours include 0-5, we need next calendar day for those
-      targetDate.setDate(targetDate.getDate()+dayOffset);
-      const dateStr=targetDate.toISOString().slice(0,10);
-
-      // For overnight, hours 22-23 are on dateStr, hours 0-5 are on dateStr+1
+    // Helper: get hourly data for a range of hours on a given date string
+    function getHourlySlice(dateStr, hours, nextDateStr){
       const temps=[], codes=[], precips=[];
-      dp.hours.forEach(hr=>{
-        let lookupDate=dateStr;
-        if(dpIdx===3&&hr<=5){
-          // next calendar day
-          const next=new Date(targetDate);
-          next.setDate(next.getDate()+1);
-          lookupDate=next.toISOString().slice(0,10);
-        }
-        const timeStr=`${lookupDate}T${String(hr).padStart(2,'0')}:00`;
+      hours.forEach(hr=>{
+        const useDate=(nextDateStr&&hr<=5)?nextDateStr:dateStr;
+        const timeStr=`${useDate}T${String(hr).padStart(2,'0')}:00`;
         const idx=hourlyTimes.indexOf(timeStr);
         if(idx!==-1){
           if(hourlyTemps[idx]!=null) temps.push(hourlyTemps[idx]);
@@ -391,55 +350,85 @@ async function loadWeather(){
           if(hourlyPrecip[idx]!=null) precips.push(hourlyPrecip[idx]);
         }
       });
-
-      if(temps.length===0) return null;
-
-      const avgTemp=Math.round(temps.reduce((a,b)=>a+b,0)/temps.length);
-      const maxTemp=Math.round(Math.max(...temps));
-      const minTemp=Math.round(Math.min(...temps));
-      // Most common weather code
+      if(!temps.length) return null;
       const codeFreq={};
       codes.forEach(c=>{ codeFreq[c]=(codeFreq[c]||0)+1; });
-      const dominantCode=Object.keys(codeFreq).sort((a,b)=>codeFreq[b]-codeFreq[a])[0];
-      const avgPrecip=precips.length?Math.round(precips.reduce((a,b)=>a+b,0)/precips.length):null;
-
-      return {avgTemp, maxTemp, minTemp, dominantCode:parseInt(dominantCode), avgPrecip};
+      const dominantCode=parseInt(Object.keys(codeFreq).sort((a,b)=>codeFreq[b]-codeFreq[a])[0]);
+      return {
+        max:Math.round(Math.max(...temps)),
+        min:Math.round(Math.min(...temps)),
+        avg:Math.round(temps.reduce((a,b)=>a+b,0)/temps.length),
+        code:dominantCode,
+        precip:precips.length?Math.round(precips.reduce((a,b)=>a+b,0)/precips.length):null
+      };
     }
 
-    // Label for a slot
-    function slotLabel(dayOffset, dpIdx, isFirst){
-      const dp=DAYPARTS[dpIdx];
-      if(isFirst) return 'Now · '+dp.name;
-      if(dayOffset===0) return dp.name;
-      if(dayOffset===1) return 'Tomorrow · '+dp.name;
-      const d=new Date(TODAY); d.setDate(d.getDate()+dayOffset);
-      return d.toLocaleDateString('en-US',{weekday:'long'})+' · '+dp.name;
-    }
+    const nowHour=new Date().getHours();
+    const todayStr=TODAY.toISOString().slice(0,10);
+    const tom=new Date(TODAY); tom.setDate(tom.getDate()+1);
+    const tomStr=tom.toISOString().slice(0,10);
+    const dayAfter=new Date(TODAY); dayAfter.setDate(dayAfter.getDate()+2);
+    const dayAfterStr=dayAfter.toISOString().slice(0,10);
 
-    function slotSub(dayOffset, dpIdx){
-      const d=new Date(TODAY); d.setDate(d.getDate()+dayOffset);
-      return d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
-    }
+    // Current conditions: single hour right now
+    const currentSlice=getHourlySlice(todayStr,[nowHour],null);
+
+    // Fixed named slots
+    const namedSlots=[
+      {
+        label:'Current Conditions', sub:'Right Now', highlight:true,
+        data:currentSlice
+      },
+      {
+        label:'Today', sub:TODAY.toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'}),
+        data:getHourlySlice(todayStr,[6,7,8,9,10,11,12,13,14,15,16,17],null),
+        showHiLo:true
+      },
+      {
+        label:'Tonight', sub:'Evening hours',
+        data:getHourlySlice(todayStr,[18,19,20,21],null),
+        showHiLo:false
+      },
+      {
+        label:'Overnight', sub:'Late night',
+        data:getHourlySlice(todayStr,[22,23],tomStr) || getHourlySlice(tomStr,[0,1,2,3,4,5],null),
+        showHiLo:false
+      },
+      {
+        label:'Tomorrow', sub:tom.toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'}),
+        data:getHourlySlice(tomStr,[6,7,8,9,10,11,12,13,14,15,16,17],null),
+        showHiLo:true
+      },
+      {
+        label:dayAfter.toLocaleDateString('en-US',{weekday:'long'}),
+        sub:dayAfter.toLocaleDateString('en-US',{month:'short',day:'numeric'}),
+        data:getHourlySlice(dayAfterStr,[6,7,8,9,10,11,12,13,14,15,16,17],null),
+        showHiLo:true
+      },
+    ];
 
     let html=alertHTML+'<div class="weather-grid">';
-    slots.forEach((s,i)=>{
-      const sd=getSlotData(s.dayOffset, s.dpIdx);
-      if(!sd){ return; }
-      const {emoji,desc}=wmoLabel(sd.dominantCode);
-      const isOvernight=s.dpIdx===3;
-      const label=slotLabel(s.dayOffset, s.dpIdx, i===0);
-      const sub=slotSub(s.dayOffset, s.dpIdx);
+    namedSlots.forEach((s,i)=>{
+      if(!s.data) return;
+      const {emoji,desc}=wmoLabel(s.data.code);
+      const isCurrentConditions=(i===0);
 
-      html+=`<div class="weather-day"${i===0?' style="border-color:var(--gold)"':''}>
-        <div class="day-name" style="${i===0?'color:#fff':''}">${label}</div>
-        <div class="date-sub">${sub}</div>
+      let tempHTML='';
+      if(isCurrentConditions){
+        tempHTML=`<div class="hi">${s.data.avg}°F</div>`;
+      } else if(s.showHiLo){
+        tempHTML=`<div class="hi">${s.data.max}°</div><div class="lo">/ ${s.data.min}°F</div>`;
+      } else {
+        tempHTML=`<div class="hi">${s.data.avg}°F</div>`;
+      }
+
+      html+=`<div class="weather-day"${s.highlight?' style="border-color:var(--gold)"':''}>
+        <div class="day-name" style="${s.highlight?'color:#fff':''}">${s.label}</div>
+        <div class="date-sub">${s.sub}</div>
         <div class="emoji">${emoji}</div>
-        ${isOvernight
-          ? `<div class="hi">${sd.minTemp}°</div><div class="lo">low</div>`
-          : `<div class="hi">${sd.maxTemp}°</div><div class="lo">/ ${sd.minTemp}°F</div>`
-        }
+        ${tempHTML}
         <div class="desc">${desc}</div>
-        ${sd.avgPrecip!=null?`<div class="precip">💧 ${sd.avgPrecip}%</div>`:''}
+        ${s.data.precip!=null?`<div class="precip">💧 ${s.data.precip}%</div>`:''}
       </div>`;
     });
     html+='</div><div class="source-credit">Open-Meteo.com · NWS Alerts · Middlebury VT · Updated hourly</div>';
