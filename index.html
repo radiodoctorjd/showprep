@@ -1217,14 +1217,23 @@ async function loadDailyExtras(){
       const res=await fetch('https://api.allorigins.win/get?url='+encodeURIComponent(url));
       if(!res.ok) throw new Error('allorigins '+res.status);
       const j=await res.json();
-      const html=j.contents||'';
+      const content=j.contents||'';
 
-      // Jackpot: "Estimated Jackpot\n$348,000,000"
-      const jackpotMatch=html.match(/Estimated Jackpot[^$]*(\$[\d,]+(?:,\d+)*)/);
+      // The page has a carousel at the top showing ALL games, then the specific game section
+      // starting with "# Powerball" or "# Mega Millions". We must skip past the carousel.
+      // Find the h1 heading for the specific game and only parse content after it.
+      const h1markers=['# Powerball\n','# Mega Millions\n'];
+      let gameSection=content;
+      for(const marker of h1markers){
+        const idx=content.indexOf(marker);
+        if(idx>0){ gameSection=content.slice(idx); break; }
+      }
+
+      // Now find jackpot and next draw only within the game-specific section
+      const jackpotMatch=gameSection.match(/Estimated Jackpot\s*\n\s*(\$[\d,]+)/);
       const jackpot=jackpotMatch?jackpotMatch[1].trim():'';
 
-      // Next Drawing date: "Jun 27, 2026" or "Jun 30, 2026"
-      const nextMatch=html.match(/Next Drawing\s*\n?\s*([A-Z][a-z]{2} \d{1,2}, \d{4})/);
+      const nextMatch=gameSection.match(/Next Drawing\s*\n\s*([A-Z][a-z]{2} \d{1,2}, \d{4})/);
       const nextDate=nextMatch?nextMatch[1].trim():'';
 
       return {jackpot, nextDate};
