@@ -917,10 +917,17 @@ async function loadTrending(){
       const {xml,src}=r.value;
       Array.from(xml.querySelectorAll('item')).slice(0,src.limit).forEach(item=>{
         const title=strip(item.querySelector('title')?.textContent||'');
-        // Google News link tags are often empty — guid has the real URL
-        const link=(item.querySelector('guid')?.textContent||item.querySelector('link')?.textContent||'').trim();
+        // Google News RSS: <link> contains the clickable CBMi... redirect URL.
+        // <guid> is an internal non-clickable ID — don't use it for Google News.
+        // rss2json proxy puts the URL in item._item.link directly.
+        let link='';
+        if(item._item&&item._item.link) {
+          link=item._item.link.trim(); // rss2json format
+        } else {
+          // Raw XML: <link> is the redirect URL, not <guid>
+          link=(item.querySelector('link')?.textContent||'').trim();
+        }
         const pubDate=fmt(item.querySelector('pubDate')?.textContent||'');
-        // source element has the publisher name (e.g. "CNN", "AP")
         const publisher=item.querySelector('source')?.textContent?.trim()||'';
         if(title) allItems.push({title,link,pubDate,publisher,cat:src.cat});
       });
@@ -1220,7 +1227,9 @@ async function loadDailyExtras(){
         const items=Array.from(rssResult.value.querySelectorAll('item'));
         for(const item of items.slice(0,5)){
           const title=strip(item.querySelector('title')?.textContent||'');
-          const link=(item.querySelector('guid')?.textContent||item.querySelector('link')?.textContent||'').trim();
+          let link='';
+          if(item._item&&item._item.link) link=item._item.link.trim();
+          else link=(item.querySelector('link')?.textContent||'').trim();
           const pub=fmt(item.querySelector('pubDate')?.textContent||'');
           const j=extractJackpot(title);
           if(j&&!jackpot){ jackpot=j; }
@@ -1335,7 +1344,10 @@ async function loadTraffic(){
         gotItems=true;
         items.forEach(item=>{
           const title=strip(item.querySelector('title')?.textContent||'');
-          const link=(item.querySelector('guid')?.textContent||item.querySelector('link')?.textContent||'').trim();
+          // Use <link> for Google News (clickable redirect), not <guid>
+          let link='';
+          if(item._item&&item._item.link) link=item._item.link.trim();
+          else link=(item.querySelector('link')?.textContent||'').trim();
           const pub=fmt(item.querySelector('pubDate')?.textContent||'');
           const publisher=item.querySelector('source')?.textContent?.trim()||'';
           if(!title) return;
