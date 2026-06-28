@@ -883,104 +883,84 @@ async function loadNews(){
 }
 
 /* ══════════════════════════════════════════
-   TRENDING — Google Trends RSS (trending?geo=US export feed)
-   Fallback: E! Online + People + ET Online
+   TRENDING — Google News RSS (no key, no proxy issues, highly reliable)
+   Pulls: Entertainment + US Top Stories + targeted classic hits searches
+   Groups by category for easy on-air scanning
 ══════════════════════════════════════════ */
 async function loadTrending(){
   setLoading('body-trending');
-
-  // Try Google Trends RSS first (the export feed from trends.google.com/trending?geo=US)
-  const googleTrendsUrls=[
-    'https://trends.google.com/trending/rss?geo=US',
-    'https://trends.google.com/trends/trendingsearches/daily/rss?geo=US',
-  ];
-
-  for(const trendUrl of googleTrendsUrls){
-    try {
-      const xml=await fetchRSS(trendUrl);
-      const items=Array.from(xml.querySelectorAll('item'));
-      if(items.length===0) continue;
-
-      let html='<div class="tag-cloud" style="margin-bottom:14px">';
-      items.slice(0,15).forEach(item=>{
-        const title=strip(item.querySelector('title')?.textContent||'');
-        if(!title) return;
-        const searchUrl=`https://www.google.com/search?q=${encodeURIComponent(title)}`;
-        html+=`<span class="tag"><a href="${searchUrl}" target="_blank" style="color:var(--gold);text-decoration:none">${title}</a></span>`;
-      });
-      html+='</div>';
-
-      items.slice(0,10).forEach(item=>{
-        const title=strip(item.querySelector('title')?.textContent||'');
-        if(!title) return;
-        // Google Trends RSS includes ht:approx_traffic and ht:news_item elements
-        const traffic=item.getElementsByTagNameNS('*','approx_traffic')[0]?.textContent||
-                      item.querySelector('approx_traffic')?.textContent||'';
-        const newsTitle=item.getElementsByTagNameNS('*','news_item_title')[0]?.textContent||
-                        item.querySelector('news_item_title')?.textContent||'';
-        const newsUrl=item.getElementsByTagNameNS('*','news_item_url')[0]?.textContent||
-                      item.querySelector('news_item_url')?.textContent||'';
-        const newsSnippet=strip(item.getElementsByTagNameNS('*','news_item_snippet')[0]?.textContent||
-                                item.querySelector('news_item_snippet')?.textContent||'').slice(0,120);
-        const searchUrl=`https://www.google.com/search?q=${encodeURIComponent(title)}`;
-
-        html+=`<div class="item">
-          <div class="item-label">🔥 TRENDING${traffic?' · '+traffic+' searches':''}</div>
-          <div class="item-title"><a href="${searchUrl}" target="_blank">${title}</a></div>
-          ${newsTitle?`<div class="item-body" style="margin-top:4px">
-            ${newsUrl?`<a href="${newsUrl}" target="_blank" style="color:var(--text)">${newsTitle}</a>`:newsTitle}
-          </div>`:''}
-          ${newsSnippet?`<div class="item-body" style="color:var(--muted);margin-top:2px">${newsSnippet}${newsSnippet.length>=120?'…':''}</div>`:''}
-        </div>`;
-      });
-
-      html+='<div class="source-credit">Source: Google Trends — trends.google.com/trending?geo=US</div>';
-      document.getElementById('body-trending').innerHTML=stampUpdated(html);
-      return; // success — done
-    } catch(e){ /* try next URL or fall through to backup */ }
-  }
-
-  // Fallback: pop culture RSS feeds
   try {
+    // Google News RSS feeds — free, no key, no auth
+    // Entertainment topic hash is stable and well-documented
     const sources=[
-      {url:'https://www.eonline.com/syndication/feeds/rssfeeds/topstories.xml', name:'E! Online',  cat:'POP CULTURE'},
-      {url:'https://people.com/feed/',                                           name:'People',    cat:'CELEBRITY'},
-      {url:'https://www.etonline.com/news/rss',                                 name:'ET Online', cat:'ENTERTAINMENT'},
-      {url:'https://www.usmagazine.com/feed/',                                  name:'Us Weekly', cat:'CELEBRITY'},
+      {
+        url:'https://news.google.com/rss/headlines/section/topic/ENTERTAINMENT?hl=en-US&gl=US&ceid=US:en',
+        cat:'🎬 Entertainment', limit:6
+      },
+      {
+        url:'https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en',
+        cat:'📰 Top Stories', limit:5
+      },
+      {
+        url:'https://news.google.com/rss/search?q=classic+rock+OR+music+tour+OR+concert+OR+album+when:3d&hl=en-US&gl=US&ceid=US:en',
+        cat:'🎸 Music Buzz', limit:4
+      },
     ];
 
     const allItems=[];
-    const results=await Promise.allSettled(sources.map(s=>fetchRSS(s.url).then(xml=>({xml,src:s}))));
+    const results=await Promise.allSettled(
+      sources.map(s=>fetchRSS(s.url).then(xml=>({xml,src:s})))
+    );
+
     results.forEach(r=>{
       if(r.status!=='fulfilled') return;
       const {xml,src}=r.value;
-      Array.from(xml.querySelectorAll('item')).slice(0,6).forEach(item=>{
+      Array.from(xml.querySelectorAll('item')).slice(0,src.limit).forEach(item=>{
         const title=strip(item.querySelector('title')?.textContent||'');
-        const link=(item.querySelector('link')?.textContent||item.querySelector('guid')?.textContent||'').trim();
+        // Google News link tags are often empty — guid has the real URL
+        const link=(item.querySelector('guid')?.textContent||item.querySelector('link')?.textContent||'').trim();
         const pubDate=fmt(item.querySelector('pubDate')?.textContent||'');
-        const desc=strip(item.querySelector('description')?.textContent||'').slice(0,140);
-        if(title) allItems.push({title,link,pubDate,desc,source:src.name,cat:src.cat});
+        // source element has the publisher name (e.g. "CNN", "AP")
+        const publisher=item.querySelector('source')?.textContent?.trim()||'';
+        if(title) allItems.push({title,link,pubDate,publisher,cat:src.cat});
       });
     });
 
-    if(allItems.length===0) throw new Error('All trending sources failed');
+    if(allItems.length===0) throw new Error('No trending items loaded');
 
+    // Dedupe across categories
     const seen=new Set();
     const deduped=allItems.filter(i=>{
-      const key=i.title.slice(0,30).toLowerCase();
+      const key=i.title.slice(0,40).toLowerCase();
       if(seen.has(key)) return false;
       seen.add(key); return true;
     });
 
-    let html='';
-    deduped.slice(0,12).forEach(t=>{
-      html+=`<div class="item">
-        <div class="item-label">🔥 ${t.cat} · ${t.source} · ${t.pubDate}</div>
-        <div class="item-title">${t.link?`<a href="${t.link}" target="_blank">${t.title}</a>`:t.title}</div>
-        ${t.desc?`<div class="item-body">${t.desc}${t.desc.length>=140?'…':''}</div>`:''}
-      </div>`;
+    // Group by category for cleaner layout
+    const byCat={};
+    deduped.forEach(i=>{
+      if(!byCat[i.cat]) byCat[i.cat]=[];
+      byCat[i.cat].push(i);
     });
-    html+='<div class="source-credit">Sources: E! Online · People · ET Online · Us Weekly</div>';
+
+    let html='';
+    Object.entries(byCat).forEach(([cat,items])=>{
+      html+=`<div style="margin-bottom:14px">
+        <div style="font-family:'Oswald',sans-serif;font-size:12px;color:var(--red);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid var(--border)">${cat}</div>`;
+      items.forEach(item=>{
+        html+=`<div style="padding:6px 0;border-bottom:1px solid var(--border)">
+          <div style="font-size:14px;color:var(--text);line-height:1.45;margin-bottom:2px">
+            ${item.link?`<a href="${item.link}" target="_blank" style="color:#E8C97A;text-decoration:none">${item.title}</a>`:item.title}
+          </div>
+          <div style="font-family:'Courier Prime',monospace;font-size:10px;color:var(--border)">
+            ${item.publisher?item.publisher+' · ':''}${item.pubDate}
+          </div>
+        </div>`;
+      });
+      html+='</div>';
+    });
+
+    html+='<div class="source-credit">Source: Google News</div>';
     document.getElementById('body-trending').innerHTML=stampUpdated(html);
   } catch(e){ setError('body-trending',e.message); }
 }
