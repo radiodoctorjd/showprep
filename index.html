@@ -8,166 +8,104 @@
     @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;600;700&family=Source+Sans+3:wght@400;600&family=Courier+Prime:wght@400;700&display=swap');
 
     :root {
-      --dark:#0E1014; --panel:#16191F; --mid:#1E222A; --border:#2A2F3A;
-      --text:#E8EAF0; --muted:#6B7280; --dim:#3A4050;
-      --red:#E8152A; --gold:#F5A800; --green:#22C55E; --blue:#3B82F6; --on-air:#FF3B30;
-      /* Section accent colors */
-      --c-weather:#38BDF8;  /* sky blue */
-      --c-news:#F97316;     /* orange */
-      --c-music:#A78BFA;    /* purple */
-      --c-history:#FB923C;  /* amber */
-      --c-birth:#F472B6;    /* pink */
-      --c-sports:#22C55E;   /* green */
-      --c-trend:#F59E0B;    /* yellow */
-      --c-events:#34D399;   /* teal */
-      --c-facts:#60A5FA;    /* light blue */
-      --c-lottery:#FBBF24;  /* gold */
-      --c-national:#C084FC; /* lavender */
-      --c-word:#F87171;     /* coral */
+      --bg:#F0F2F5; --panel:#FFFFFF; --border:#E2E5EA;
+      --text:#1A1D23; --muted:#6B7280; --dim:#9CA3AF;
+      --red:#E8152A; --gold:#F59E0B;
+      --c-weather:#0EA5E9; --c-news:#F97316; --c-music:#8B5CF6;
+      --c-history:#D97706; --c-birth:#EC4899; --c-sports:#16A34A;
+      --c-trend:#EF4444; --c-events:#0D9488; --c-facts:#2563EB;
+      --c-lottery:#D97706; --c-national:#7C3AED; --c-word:#DB2777;
+      --on-air:#EF4444;
     }
 
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-    body{background:var(--dark);color:var(--text);font-family:'Source Sans 3',sans-serif;font-size:15px;line-height:1.55;min-height:100vh}
+    body{background:var(--bg);color:var(--text);font-family:'Source Sans 3',sans-serif;font-size:15px;line-height:1.55;min-height:100vh}
 
-    /* ── HEADER ── */
     header{
-      background:var(--panel);
-      border-bottom:3px solid var(--red);
-      padding:0 28px;
-      display:flex;align-items:center;justify-content:space-between;gap:20px;
-      height:72px;position:sticky;top:0;z-index:100;
+      background:#fff;border-bottom:4px solid var(--red);
+      padding:0 28px;display:flex;align-items:center;justify-content:space-between;gap:20px;
+      height:76px;position:sticky;top:0;z-index:100;
+      box-shadow:0 2px 12px rgba(0,0,0,.08);
     }
     .header-left{display:flex;align-items:center;gap:14px}
-    .on-air-pip{
-      display:flex;align-items:center;gap:6px;
-      background:#2A0A0A;border:1px solid var(--red);
-      border-radius:20px;padding:4px 10px;
-    }
+    .on-air-pip{display:flex;align-items:center;gap:6px;background:#FEF2F2;border:1.5px solid var(--on-air);border-radius:20px;padding:5px 12px}
     .on-air-dot{width:8px;height:8px;border-radius:50%;background:var(--on-air);box-shadow:0 0 6px var(--on-air);animation:pulse 1.4s ease-in-out infinite}
-    .on-air-label{font-family:'Oswald',sans-serif;font-size:11px;color:var(--on-air);letter-spacing:2px}
-    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-    .station-name{font-family:'Oswald',sans-serif;font-size:26px;font-weight:700;color:#fff;letter-spacing:1px}
-    .station-name span{color:var(--gold)}
-    .tagline{font-size:11px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-top:1px}
+    .on-air-label{font-family:'Oswald',sans-serif;font-size:12px;color:var(--on-air);letter-spacing:2px;font-weight:600}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+    .station-name{font-family:'Oswald',sans-serif;font-size:28px;font-weight:700;color:var(--text)}
+    .station-name span{color:var(--red)}
+    .tagline{font-size:11px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-top:1px}
     .header-center{display:flex;flex-direction:column;align-items:center}
-    #clock{font-family:'Courier Prime',monospace;font-size:28px;font-weight:700;color:var(--gold);letter-spacing:3px;line-height:1}
-    #date-display{font-size:11px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;text-align:center;margin-top:2px}
-    #refresh-all-btn{
-      background:var(--red);color:#fff;border:none;border-radius:8px;
-      font-family:'Oswald',sans-serif;font-size:15px;font-weight:600;
-      padding:10px 22px;cursor:pointer;transition:all .15s;letter-spacing:.5px;
-    }
-    #refresh-all-btn:hover{background:#c5102a;transform:translateY(-1px)}
-    #refresh-all-btn.refreshing{background:var(--dim);cursor:not-allowed;transform:none}
+    #clock{font-family:'Courier Prime',monospace;font-size:30px;font-weight:700;color:var(--text);letter-spacing:2px;line-height:1}
+    #date-display{font-size:11px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;text-align:center;margin-top:3px}
+    #refresh-all-btn{background:var(--red);color:#fff;border:none;border-radius:10px;font-family:'Oswald',sans-serif;font-size:15px;font-weight:600;padding:11px 24px;cursor:pointer;transition:all .15s;box-shadow:0 2px 8px rgba(232,21,42,.3)}
+    #refresh-all-btn:hover{background:#c5102a;transform:translateY(-1px);box-shadow:0 4px 12px rgba(232,21,42,.35)}
+    #refresh-all-btn.refreshing{background:#9CA3AF;cursor:not-allowed;transform:none;box-shadow:none}
 
-    /* ── GRID ── */
-    .grid{
-      display:grid;
-      grid-template-columns:repeat(4,1fr);
-      gap:14px;
-      padding:18px 20px;
-      max-width:1700px;
-      margin:0 auto;
-    }
+    .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;padding:20px 22px;max-width:1700px;margin:0 auto}
     .span2{grid-column:span 2}
     .span4{grid-column:span 4}
     @media(max-width:1200px){.grid{grid-template-columns:repeat(2,1fr)}.span4{grid-column:span 2}}
     @media(max-width:640px){.grid{grid-template-columns:1fr}.span2,.span4{grid-column:span 1}}
 
-    /* ── CARDS ── */
-    .card{
-      background:var(--panel);
-      border:1px solid var(--border);
-      border-radius:12px;
-      overflow:hidden;
-      display:flex;flex-direction:column;
-    }
-    .card-header{
-      padding:10px 16px;
-      display:flex;align-items:center;justify-content:space-between;
-      border-bottom:1px solid var(--border);
-    }
-    .card-title{
-      font-family:'Oswald',sans-serif;font-size:13px;font-weight:600;
-      letter-spacing:2px;text-transform:uppercase;
-      display:flex;align-items:center;gap:7px;
-    }
-    /* Colored left border stripe per section */
-    .card-header::before{
-      content:'';display:block;width:3px;height:18px;border-radius:2px;flex-shrink:0;
-      background:var(--accent,var(--gold));
-    }
-    .refresh-btn{
-      background:none;border:none;color:var(--muted);font-size:16px;
-      cursor:pointer;padding:2px 6px;border-radius:4px;transition:color .15s;line-height:1;
-    }
-    .refresh-btn:hover{color:var(--text)}
+    .card{background:var(--panel);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 1px 4px rgba(0,0,0,.06),0 4px 16px rgba(0,0,0,.04);transition:box-shadow .2s}
+    .card:hover{box-shadow:0 4px 20px rgba(0,0,0,.1)}
+    .card-header{padding:11px 16px 10px;display:flex;align-items:center;justify-content:space-between;gap:8px;border-bottom:1px solid var(--border);background:linear-gradient(to right,var(--accent,var(--gold)) 4px,#FAFBFC 4px)}
+    .card-title{font-family:'Oswald',sans-serif;font-size:13px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--accent,var(--gold));display:flex;align-items:center;gap:6px}
+    .refresh-btn{background:none;border:none;color:var(--dim);font-size:17px;cursor:pointer;padding:2px 5px;border-radius:4px;transition:color .15s,background .15s;line-height:1}
+    .refresh-btn:hover{color:var(--accent,var(--gold));background:rgba(0,0,0,.05)}
     .card-body{padding:14px 16px;flex:1}
 
-    /* ── UTILITY ── */
-    .loading-state{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px;padding:10px 0}
-    .spinner{width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--gold);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
+    .loading-state{display:flex;align-items:center;gap:8px;color:var(--dim);font-size:13px;padding:10px 0}
+    .spinner{width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--accent,var(--gold));border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
     @keyframes spin{to{transform:rotate(360deg)}}
-    .error-state{color:#f87171;font-size:13px;padding:8px 0}
+    .error-state{color:#DC2626;font-size:13px;background:#FEF2F2;border-radius:6px;padding:8px 10px}
     .source-credit{font-size:10px;color:var(--dim);font-family:'Courier Prime',monospace;margin-top:10px;padding-top:8px;border-top:1px solid var(--border)}
     .last-updated{font-family:'Courier Prime',monospace;font-size:10px;color:var(--dim);margin-top:2px}
 
-    /* ── WEATHER ── */
     .weather-grid{display:flex;flex-wrap:wrap;gap:8px}
-    .weather-day{background:var(--mid);border:1px solid var(--border);border-radius:10px;padding:12px;min-width:100px;text-align:center;flex:1}
-    .weather-day.current{border-color:var(--c-weather);background:#0C1A22}
+    .weather-day{background:var(--bg);border:1.5px solid var(--border);border-radius:12px;padding:12px;min-width:100px;text-align:center;flex:1}
+    .weather-day.current{border-color:var(--c-weather);background:#EFF9FF}
     .weather-day .day-name{font-family:'Oswald',sans-serif;font-size:12px;color:var(--c-weather);letter-spacing:1px;text-transform:uppercase;margin-bottom:2px}
     .weather-day .date-sub{font-size:10px;color:var(--muted);margin-bottom:6px}
     .weather-day .emoji{font-size:26px;margin-bottom:4px}
-    .weather-day .hi{font-family:'Oswald',sans-serif;font-size:28px;font-weight:700;color:#fff}
+    .weather-day .hi{font-family:'Oswald',sans-serif;font-size:28px;font-weight:700;color:var(--text)}
     .weather-day .lo{font-family:'Oswald',sans-serif;font-size:13px;color:var(--muted)}
     .weather-day .desc{font-size:11px;color:var(--muted);margin-top:3px}
-    .weather-day .precip{font-size:11px;color:var(--blue);margin-top:3px}
-    .weather-alert{background:#1A0A0A;border:1px solid var(--red);border-radius:6px;padding:7px 10px;font-size:12px;color:#FCA5A5;margin-bottom:10px}
+    .weather-day .precip{font-size:11px;color:var(--c-weather);margin-top:3px}
+    .weather-alert{background:#FEF2F2;border:1.5px solid #FCA5A5;border-radius:8px;padding:7px 10px;font-size:12px;color:#DC2626;margin-bottom:10px}
 
-    /* ── ITEMS (news, history, etc) ── */
-    .item{border-bottom:1px solid var(--border);padding:10px 0}
+    .item{border-bottom:1px solid var(--border);padding:9px 0}
     .item:last-child{border-bottom:none;padding-bottom:0}
-    .item-label{font-family:'Oswald',sans-serif;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:3px;color:var(--accent,var(--muted))}
-    .item-title{font-weight:600;font-size:14px;color:#fff;line-height:1.4}
+    .item-label{font-family:'Oswald',sans-serif;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:3px;color:var(--accent,var(--muted));font-weight:600}
+    .item-title{font-weight:600;font-size:14px;color:var(--text);line-height:1.4}
     .item-title a{color:inherit;text-decoration:none}
-    .item-title a:hover{color:var(--accent,var(--gold));text-decoration:underline}
-    .item-body{font-size:13px;color:var(--muted);line-height:1.5;margin-top:3px}
-    .item-meta{font-family:'Courier Prime',monospace;font-size:10px;color:var(--dim);margin-top:4px}
+    .item-title a:hover{color:var(--accent,var(--gold))}
+    .item-body{font-size:13px;color:var(--muted);line-height:1.5;margin-top:2px}
+    .item-meta{font-family:'Courier Prime',monospace;font-size:10px;color:var(--dim);margin-top:3px}
 
-    /* ── BIRTHDAYS ── */
     .birthday-list{display:flex;flex-direction:column;gap:8px}
-    .birthday-row{display:flex;align-items:flex-start;gap:12px;background:var(--mid);border-radius:8px;padding:10px 12px}
-    .birthday-age{font-family:'Oswald',sans-serif;font-size:24px;font-weight:700;color:var(--c-birth);min-width:38px;text-align:center;line-height:1}
-    .birthday-name{font-weight:600;font-size:14px;color:#fff;margin-bottom:1px}
+    .birthday-row{display:flex;align-items:flex-start;gap:12px;background:var(--bg);border-radius:10px;padding:10px 12px;border:1px solid var(--border)}
+    .birthday-age{font-family:'Oswald',sans-serif;font-size:26px;font-weight:700;color:var(--c-birth);min-width:38px;text-align:center;line-height:1}
+    .birthday-name{font-weight:600;font-size:14px;color:var(--text);margin-bottom:1px}
     .birthday-name a{color:inherit;text-decoration:none}
     .birthday-name a:hover{color:var(--c-birth)}
     .birthday-note{font-size:12px;color:var(--muted)}
 
-    /* ── EVENTS ── */
     .event-item{border-left:3px solid var(--c-events);padding:7px 0 7px 12px;margin-bottom:10px}
     .event-item:last-child{margin-bottom:0}
     .event-date{font-family:'Courier Prime',monospace;font-size:11px;color:var(--c-events);text-transform:uppercase;letter-spacing:1px;margin-bottom:2px}
-    .event-name{font-weight:600;font-size:14px;color:#fff}
+    .event-name{font-weight:600;font-size:14px;color:var(--text)}
     .event-name a{color:inherit;text-decoration:none}
-    .event-name a:hover{text-decoration:underline}
+    .event-name a:hover{color:var(--c-events)}
     .event-detail{font-size:12px;color:var(--muted);margin-top:1px}
     .sources-bar{margin-top:12px;padding-top:10px;border-top:1px solid var(--border);font-size:12px;color:var(--muted)}
     .sources-bar a{color:var(--c-events);text-decoration:none}
 
-    /* ── FACTS ── */
-    .fact-box{background:var(--mid);border-left:3px solid var(--c-facts);border-radius:0 8px 8px 0;padding:12px 14px;font-size:14px;color:var(--text);line-height:1.6;margin-bottom:10px}
+    .fact-box{background:var(--bg);border-left:3px solid var(--c-facts);border-radius:0 8px 8px 0;padding:10px 13px;font-size:14px;color:var(--text);line-height:1.6;margin-bottom:8px}
     .fact-box:last-child{margin-bottom:0}
 
-    /* ── SPORTS ── */
-    .sports-game{display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px}
-    .sports-game:last-child{border-bottom:none}
-    .sports-team{min-width:80px;font-weight:600}
-    .sports-status{font-family:'Courier Prime',monospace;font-size:11px;color:var(--muted);text-align:center;flex:1}
-    .sports-live{color:var(--on-air)}
-
-    /* ── FOOTER ── */
-    footer{text-align:center;padding:16px;color:var(--dim);font-family:'Courier Prime',monospace;font-size:11px;letter-spacing:1px;border-top:1px solid var(--border);margin-top:4px}
+    footer{text-align:center;padding:16px;color:var(--dim);font-family:'Courier Prime',monospace;font-size:11px;letter-spacing:1px;border-top:1px solid var(--border);margin-top:4px;background:#fff}
     footer span{color:var(--red)}
   </style>
 </head>
@@ -193,104 +131,63 @@
 
 <div class="grid">
 
-  <!-- WEATHER: full width -->
   <div class="card span4" style="--accent:var(--c-weather)">
-    <div class="card-header">
-      <div class="card-title" style="color:var(--c-weather)">🌤 Middlebury, VT — Weather Forecast</div>
-      <button class="refresh-btn" onclick="loadWeather()" title="Refresh">↻</button>
-    </div>
+    <div class="card-header"><div class="card-title">🌤 Middlebury, VT — Weather Forecast</div><button class="refresh-btn" onclick="loadWeather()" title="Refresh">↻</button></div>
     <div class="card-body" id="body-weather"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
   </div>
 
-  <!-- ROW 2: Local News | Music News | Trending | Sports -->
   <div class="card span2" style="--accent:var(--c-news)">
-    <div class="card-header">
-      <div class="card-title" style="color:var(--c-news)">📰 Local News</div>
-      <button class="refresh-btn" onclick="loadNews()" title="Refresh">↻</button>
-    </div>
+    <div class="card-header"><div class="card-title">📰 Local News</div><button class="refresh-btn" onclick="loadNews()" title="Refresh">↻</button></div>
     <div class="card-body" id="body-news"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
   </div>
 
   <div class="card" style="--accent:var(--c-music)">
-    <div class="card-header">
-      <div class="card-title" style="color:var(--c-music)">🎸 Music News</div>
-      <button class="refresh-btn" onclick="loadMusicNews()" title="Refresh">↻</button>
-    </div>
+    <div class="card-header"><div class="card-title">🎸 Music News</div><button class="refresh-btn" onclick="loadMusicNews()" title="Refresh">↻</button></div>
     <div class="card-body" id="body-musicnews"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
   </div>
 
   <div class="card" style="--accent:var(--c-trend)">
-    <div class="card-header">
-      <div class="card-title" style="color:var(--c-trend)">🔥 Trending</div>
-      <button class="refresh-btn" onclick="loadTrending()" title="Refresh">↻</button>
-    </div>
+    <div class="card-header"><div class="card-title">🔥 Trending</div><button class="refresh-btn" onclick="loadTrending()" title="Refresh">↻</button></div>
     <div class="card-body" id="body-trending"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
   </div>
 
-  <!-- ROW 3: History | Birthdays | Events | National Day -->
   <div class="card" style="--accent:var(--c-history)">
-    <div class="card-header">
-      <div class="card-title" style="color:var(--c-history)">📅 Today in History</div>
-      <button class="refresh-btn" onclick="loadHistory()" title="Refresh">↻</button>
-    </div>
+    <div class="card-header"><div class="card-title">📅 Today in History</div><button class="refresh-btn" onclick="loadHistory()" title="Refresh">↻</button></div>
     <div class="card-body" id="body-history"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
   </div>
 
   <div class="card" style="--accent:var(--c-birth)">
-    <div class="card-header">
-      <div class="card-title" style="color:var(--c-birth)">🎂 Birthdays</div>
-      <button class="refresh-btn" onclick="loadBirthdays()" title="Refresh">↻</button>
-    </div>
+    <div class="card-header"><div class="card-title">🎂 Birthdays</div><button class="refresh-btn" onclick="loadBirthdays()" title="Refresh">↻</button></div>
     <div class="card-body" id="body-birthdays"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
   </div>
 
   <div class="card" style="--accent:var(--c-events)">
-    <div class="card-header">
-      <div class="card-title" style="color:var(--c-events)">📌 Community Calendar</div>
-      <button class="refresh-btn" onclick="loadEvents()" title="Refresh">↻</button>
-    </div>
+    <div class="card-header"><div class="card-title">📌 Community Calendar</div><button class="refresh-btn" onclick="loadEvents()" title="Refresh">↻</button></div>
     <div class="card-body" id="body-events"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
   </div>
 
   <div class="card" style="--accent:var(--c-national)">
-    <div class="card-header">
-      <div class="card-title" style="color:var(--c-national)">📆 National Days</div>
-      <button class="refresh-btn" onclick="loadNationalDay()" title="Refresh">↻</button>
-    </div>
+    <div class="card-header"><div class="card-title">📆 National Days</div><button class="refresh-btn" onclick="loadNationalDay()" title="Refresh">↻</button></div>
     <div class="card-body" id="body-nationalday"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
   </div>
 
-  <!-- ROW 4: Sports | Sunrise+Lottery | Facts | Word of Day -->
   <div class="card span2" style="--accent:var(--c-sports)">
-    <div class="card-header">
-      <div class="card-title" style="color:var(--c-sports)">🏆 Sports</div>
-      <button class="refresh-btn" onclick="loadSports()" title="Refresh">↻</button>
-    </div>
+    <div class="card-header"><div class="card-title">🏆 Sports</div><button class="refresh-btn" onclick="loadSports()" title="Refresh">↻</button></div>
     <div class="card-body" id="body-sports"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
   </div>
 
   <div class="card" style="--accent:var(--c-lottery)">
-    <div class="card-header">
-      <div class="card-title" style="color:var(--c-lottery)">🌅 Sunrise · 🎟 Lottery</div>
-      <button class="refresh-btn" onclick="loadDailyExtras()" title="Refresh">↻</button>
-    </div>
+    <div class="card-header"><div class="card-title">🌅 Sunrise · 🎟 Lottery</div><button class="refresh-btn" onclick="loadDailyExtras()" title="Refresh">↻</button></div>
     <div class="card-body" id="body-extras"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
   </div>
 
   <div class="card" style="--accent:var(--c-facts)">
-    <div class="card-header">
-      <div class="card-title" style="color:var(--c-facts)">💡 Random Facts</div>
-      <button class="refresh-btn" onclick="loadFacts()" title="Refresh">↻</button>
-    </div>
+    <div class="card-header"><div class="card-title">💡 Random Facts</div><button class="refresh-btn" onclick="loadFacts()" title="Refresh">↻</button></div>
     <div class="card-body" id="body-facts"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
   </div>
 
-  <!-- Word of Day: full width -->
   <div class="card span4" style="--accent:var(--c-word)">
-    <div class="card-header">
-      <div class="card-title" style="color:var(--c-word)">💬 Word &amp; Phrase of the Day</div>
-      <button class="refresh-btn" onclick="loadWordOfDay()" title="Refresh">↻</button>
-    </div>
+    <div class="card-header"><div class="card-title">💬 Word &amp; Phrase of the Day</div><button class="refresh-btn" onclick="loadWordOfDay()" title="Refresh">↻</button></div>
     <div class="card-body" id="body-wordofday"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
   </div>
 
