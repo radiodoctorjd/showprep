@@ -838,8 +838,12 @@ async function loadTrending(){
         cat:'🎸 Music Buzz', limit:4
       },
       {
-        url:'https://news.google.com/rss/search?q=new+flavor+OR+new+snack+OR+limited+edition+food+OR+weird+world+record+OR+viral+challenge+OR+hot+dog+contest+OR+county+fair+OR+funny+animals+OR+odd+news+OR+quirky+OR+new+Oreo+OR+new+candy+when:5d&hl=en-US&gl=US&ceid=US:en',
-        cat:'🎉 Pop Culture & Oddly Interesting', limit:6
+        url:'https://news.google.com/rss/search?q=viral+OR+weird+OR+"world+record"+OR+"goes+viral"+when:3d&hl=en-US&gl=US&ceid=US:en',
+        cat:'🎉 Viral & Weird', limit:4
+      },
+      {
+        url:'https://news.google.com/rss/search?q=Oreo+OR+"new+flavor"+OR+"hot+dog+eating"+OR+"county+fair"+OR+"food+challenge"+OR+"limited+edition"+when:7d&hl=en-US&gl=US&ceid=US:en',
+        cat:'🌭 Food & Fun', limit:4
       },
     ];
 
