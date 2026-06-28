@@ -6,256 +6,290 @@
   <title>92.1 WVTK — Show Prep Dashboard</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;600;700&family=Source+Sans+3:wght@400;600&family=Courier+Prime:wght@400;700&display=swap');
+
     :root {
-      --red:#C8102E; --gold:#F5A800; --dark:#111316; --mid:#1C2028;
-      --panel:#232830; --border:#333A45; --text:#E8EAF0; --muted:#8A93A2;
-      --green:#3CBA6E; --on-air:#FF3B30;
+      --dark:#0E1014; --panel:#16191F; --mid:#1E222A; --border:#2A2F3A;
+      --text:#E8EAF0; --muted:#6B7280; --dim:#3A4050;
+      --red:#E8152A; --gold:#F5A800; --green:#22C55E; --blue:#3B82F6; --on-air:#FF3B30;
+      /* Section accent colors */
+      --c-weather:#38BDF8;  /* sky blue */
+      --c-news:#F97316;     /* orange */
+      --c-music:#A78BFA;    /* purple */
+      --c-history:#FB923C;  /* amber */
+      --c-birth:#F472B6;    /* pink */
+      --c-sports:#22C55E;   /* green */
+      --c-trend:#F59E0B;    /* yellow */
+      --c-events:#34D399;   /* teal */
+      --c-facts:#60A5FA;    /* light blue */
+      --c-lottery:#FBBF24;  /* gold */
+      --c-national:#C084FC; /* lavender */
+      --c-word:#F87171;     /* coral */
     }
+
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-    body{background:var(--dark);color:var(--text);font-family:'Source Sans 3',sans-serif;font-size:16px;line-height:1.65;min-height:100vh}
+    body{background:var(--dark);color:var(--text);font-family:'Source Sans 3',sans-serif;font-size:15px;line-height:1.55;min-height:100vh}
 
-    header{background:var(--mid);border-bottom:3px solid var(--red);padding:0 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;min-height:64px}
-    .header-left{display:flex;align-items:center;gap:16px}
-    .on-air-dot{width:12px;height:12px;border-radius:50%;background:var(--on-air);box-shadow:0 0 8px var(--on-air);animation:pulse 1.4s ease-in-out infinite;flex-shrink:0}
+    /* ── HEADER ── */
+    header{
+      background:var(--panel);
+      border-bottom:3px solid var(--red);
+      padding:0 28px;
+      display:flex;align-items:center;justify-content:space-between;gap:20px;
+      height:72px;position:sticky;top:0;z-index:100;
+    }
+    .header-left{display:flex;align-items:center;gap:14px}
+    .on-air-pip{
+      display:flex;align-items:center;gap:6px;
+      background:#2A0A0A;border:1px solid var(--red);
+      border-radius:20px;padding:4px 10px;
+    }
+    .on-air-dot{width:8px;height:8px;border-radius:50%;background:var(--on-air);box-shadow:0 0 6px var(--on-air);animation:pulse 1.4s ease-in-out infinite}
+    .on-air-label{font-family:'Oswald',sans-serif;font-size:11px;color:var(--on-air);letter-spacing:2px}
     @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-    .station-name{font-family:'Oswald',sans-serif;font-size:22px;font-weight:700;color:#fff}
+    .station-name{font-family:'Oswald',sans-serif;font-size:26px;font-weight:700;color:#fff;letter-spacing:1px}
     .station-name span{color:var(--gold)}
-    .tagline{font-family:'Courier Prime',monospace;font-size:11px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase}
-    #clock{font-family:'Courier Prime',monospace;font-size:18px;color:var(--gold);letter-spacing:2px;white-space:nowrap}
-    #refresh-all-btn{background:var(--red);color:#fff;border:none;border-radius:6px;font-family:'Oswald',sans-serif;font-size:14px;font-weight:600;padding:8px 18px;cursor:pointer;transition:background .15s}
-    #refresh-all-btn:hover{background:#a50d24}
+    .tagline{font-size:11px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-top:1px}
+    .header-center{display:flex;flex-direction:column;align-items:center}
+    #clock{font-family:'Courier Prime',monospace;font-size:28px;font-weight:700;color:var(--gold);letter-spacing:3px;line-height:1}
+    #date-display{font-size:11px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;text-align:center;margin-top:2px}
+    #refresh-all-btn{
+      background:var(--red);color:#fff;border:none;border-radius:8px;
+      font-family:'Oswald',sans-serif;font-size:15px;font-weight:600;
+      padding:10px 22px;cursor:pointer;transition:all .15s;letter-spacing:.5px;
+    }
+    #refresh-all-btn:hover{background:#c5102a;transform:translateY(-1px)}
+    #refresh-all-btn.refreshing{background:var(--dim);cursor:not-allowed;transform:none}
 
-    /* Pinterest/masonry layout using CSS columns */
+    /* ── GRID ── */
     .grid{
-      columns:3;
-      column-gap:18px;
-      padding:20px 24px;
-      max-width:1600px;
+      display:grid;
+      grid-template-columns:repeat(4,1fr);
+      gap:14px;
+      padding:18px 20px;
+      max-width:1700px;
       margin:0 auto;
     }
+    .span2{grid-column:span 2}
+    .span4{grid-column:span 4}
+    @media(max-width:1200px){.grid{grid-template-columns:repeat(2,1fr)}.span4{grid-column:span 2}}
+    @media(max-width:640px){.grid{grid-template-columns:1fr}.span2,.span4{grid-column:span 1}}
+
+    /* ── CARDS ── */
     .card{
-      break-inside:avoid;
-      margin-bottom:18px;
-      display:inline-block;
-      width:100%;
+      background:var(--panel);
+      border:1px solid var(--border);
+      border-radius:12px;
+      overflow:hidden;
+      display:flex;flex-direction:column;
     }
-    .card.wide{
-      column-span:all;
-      display:block;
+    .card-header{
+      padding:10px 16px;
+      display:flex;align-items:center;justify-content:space-between;
+      border-bottom:1px solid var(--border);
     }
-    @media(max-width:1000px){.grid{columns:2}}
-    @media(max-width:600px){.grid{columns:1}}
+    .card-title{
+      font-family:'Oswald',sans-serif;font-size:13px;font-weight:600;
+      letter-spacing:2px;text-transform:uppercase;
+      display:flex;align-items:center;gap:7px;
+    }
+    /* Colored left border stripe per section */
+    .card-header::before{
+      content:'';display:block;width:3px;height:18px;border-radius:2px;flex-shrink:0;
+      background:var(--accent,var(--gold));
+    }
+    .refresh-btn{
+      background:none;border:none;color:var(--muted);font-size:16px;
+      cursor:pointer;padding:2px 6px;border-radius:4px;transition:color .15s;line-height:1;
+    }
+    .refresh-btn:hover{color:var(--text)}
+    .card-body{padding:14px 16px;flex:1}
 
-    .card{background:var(--panel);border:1px solid var(--border);border-radius:10px;overflow:hidden;display:flex;flex-direction:column}
-    .card-header{background:var(--mid);border-bottom:2px solid var(--red);padding:13px 20px;display:flex;align-items:center;justify-content:space-between;gap:8px}
-    .card-title{font-family:'Oswald',sans-serif;font-size:16px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);display:flex;align-items:center;gap:8px}
-    .refresh-btn{background:none;border:1px solid var(--border);border-radius:4px;color:var(--muted);font-size:13px;padding:3px 8px;cursor:pointer;transition:color .15s,border-color .15s}
-    .refresh-btn:hover{color:var(--gold);border-color:var(--gold)}
-    .card-body{padding:18px 20px}
-    
-    
-
-    .loading-state{display:flex;align-items:center;gap:10px;color:var(--muted);font-family:'Courier Prime',monospace;font-size:13px;padding:12px 0}
-    .spinner{width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--gold);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
+    /* ── UTILITY ── */
+    .loading-state{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px;padding:10px 0}
+    .spinner{width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--gold);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
     @keyframes spin{to{transform:rotate(360deg)}}
-    .error-state{color:#f87171;font-size:13px;padding:10px 0;line-height:1.6}
+    .error-state{color:#f87171;font-size:13px;padding:8px 0}
+    .source-credit{font-size:10px;color:var(--dim);font-family:'Courier Prime',monospace;margin-top:10px;padding-top:8px;border-top:1px solid var(--border)}
+    .last-updated{font-family:'Courier Prime',monospace;font-size:10px;color:var(--dim);margin-top:2px}
 
-    /* WEATHER */
-    .weather-grid{display:flex;flex-wrap:wrap;gap:10px}
-    .weather-day{background:var(--mid);border:1px solid var(--border);border-radius:10px;padding:14px 16px;min-width:110px;text-align:center;flex:1}
-    .weather-day .day-name{font-family:'Oswald',sans-serif;font-size:13px;color:var(--gold);letter-spacing:1px;text-transform:uppercase;margin-bottom:3px}
-    .weather-day .date-sub{font-size:11px;color:var(--muted);margin-bottom:8px}
-    .weather-day .emoji{font-size:28px;margin-bottom:6px}
-    .weather-day .hi{font-family:'Oswald',sans-serif;font-size:26px;font-weight:700;color:#fff}
-    .weather-day .lo{font-family:'Oswald',sans-serif;font-size:14px;color:var(--muted)}
-    .weather-day .desc{font-size:12px;color:var(--muted);margin-top:4px}
-    .weather-day .precip{font-size:12px;color:#60A5FA;margin-top:4px}
-    .weather-alert{background:#3B1515;border:1px solid var(--red);border-radius:6px;padding:8px 12px;font-size:13px;color:#FCA5A5;margin-bottom:12px;line-height:1.5}
+    /* ── WEATHER ── */
+    .weather-grid{display:flex;flex-wrap:wrap;gap:8px}
+    .weather-day{background:var(--mid);border:1px solid var(--border);border-radius:10px;padding:12px;min-width:100px;text-align:center;flex:1}
+    .weather-day.current{border-color:var(--c-weather);background:#0C1A22}
+    .weather-day .day-name{font-family:'Oswald',sans-serif;font-size:12px;color:var(--c-weather);letter-spacing:1px;text-transform:uppercase;margin-bottom:2px}
+    .weather-day .date-sub{font-size:10px;color:var(--muted);margin-bottom:6px}
+    .weather-day .emoji{font-size:26px;margin-bottom:4px}
+    .weather-day .hi{font-family:'Oswald',sans-serif;font-size:28px;font-weight:700;color:#fff}
+    .weather-day .lo{font-family:'Oswald',sans-serif;font-size:13px;color:var(--muted)}
+    .weather-day .desc{font-size:11px;color:var(--muted);margin-top:3px}
+    .weather-day .precip{font-size:11px;color:var(--blue);margin-top:3px}
+    .weather-alert{background:#1A0A0A;border:1px solid var(--red);border-radius:6px;padding:7px 10px;font-size:12px;color:#FCA5A5;margin-bottom:10px}
 
-    /* ITEMS */
-    .item{border-bottom:1px solid var(--border);padding:14px 0}
-    .item:last-child{border-bottom:none}
-    .item-label{font-family:'Oswald',sans-serif;font-size:12px;color:var(--red);letter-spacing:1.2px;text-transform:uppercase;margin-bottom:5px}
-    .item-title{font-weight:600;font-size:15px;color:#fff;margin-bottom:4px;line-height:1.5}
-    .item-title a{color:#E8C97A;text-decoration:none}
-    .item-title a:hover{color:#fff;text-decoration:underline}
-    .item-body{font-size:14px;color:var(--muted);line-height:1.6}
-    .item-meta{font-family:'Courier Prime',monospace;font-size:11px;color:var(--border);margin-top:5px;letter-spacing:.5px}
+    /* ── ITEMS (news, history, etc) ── */
+    .item{border-bottom:1px solid var(--border);padding:10px 0}
+    .item:last-child{border-bottom:none;padding-bottom:0}
+    .item-label{font-family:'Oswald',sans-serif;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:3px;color:var(--accent,var(--muted))}
+    .item-title{font-weight:600;font-size:14px;color:#fff;line-height:1.4}
+    .item-title a{color:inherit;text-decoration:none}
+    .item-title a:hover{color:var(--accent,var(--gold));text-decoration:underline}
+    .item-body{font-size:13px;color:var(--muted);line-height:1.5;margin-top:3px}
+    .item-meta{font-family:'Courier Prime',monospace;font-size:10px;color:var(--dim);margin-top:4px}
 
-    /* BIRTHDAYS */
-    .birthday-list{display:flex;flex-direction:column;gap:10px}
-    .birthday-row{display:flex;align-items:flex-start;gap:14px;background:var(--mid);border-radius:8px;padding:12px 14px}
-    .birthday-age{font-family:'Oswald',sans-serif;font-size:22px;font-weight:700;color:var(--gold);min-width:40px;text-align:center;line-height:1;padding-top:2px}
-    .birthday-name{font-weight:600;font-size:15px;color:#fff;margin-bottom:2px}
-    .birthday-name a{color:#E8C97A;text-decoration:none}
-    .birthday-name a:hover{color:var(--gold)}
-    .birthday-note{font-size:13px;color:var(--muted);line-height:1.5}
+    /* ── BIRTHDAYS ── */
+    .birthday-list{display:flex;flex-direction:column;gap:8px}
+    .birthday-row{display:flex;align-items:flex-start;gap:12px;background:var(--mid);border-radius:8px;padding:10px 12px}
+    .birthday-age{font-family:'Oswald',sans-serif;font-size:24px;font-weight:700;color:var(--c-birth);min-width:38px;text-align:center;line-height:1}
+    .birthday-name{font-weight:600;font-size:14px;color:#fff;margin-bottom:1px}
+    .birthday-name a{color:inherit;text-decoration:none}
+    .birthday-name a:hover{color:var(--c-birth)}
+    .birthday-note{font-size:12px;color:var(--muted)}
 
-    /* EVENTS */
-    .event-item{border-left:3px solid var(--gold);padding:8px 0 8px 14px;margin-bottom:14px}
-    .event-date{font-family:'Courier Prime',monospace;font-size:12px;color:var(--gold);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px}
-    .event-name{font-weight:600;font-size:15px;color:#fff;margin-bottom:3px}
-    .event-name a{color:#E8C97A;text-decoration:none}
-    .event-name a:hover{color:#fff;text-decoration:underline}
-    .event-detail{font-size:12px;color:var(--muted);margin-top:2px}
-    .sources-bar{margin-top:16px;padding-top:12px;border-top:1px solid var(--border);font-size:12px;color:var(--muted)}
-    .sources-bar a{color:var(--gold);text-decoration:none}
-    .sources-bar a:hover{text-decoration:underline}
+    /* ── EVENTS ── */
+    .event-item{border-left:3px solid var(--c-events);padding:7px 0 7px 12px;margin-bottom:10px}
+    .event-item:last-child{margin-bottom:0}
+    .event-date{font-family:'Courier Prime',monospace;font-size:11px;color:var(--c-events);text-transform:uppercase;letter-spacing:1px;margin-bottom:2px}
+    .event-name{font-weight:600;font-size:14px;color:#fff}
+    .event-name a{color:inherit;text-decoration:none}
+    .event-name a:hover{text-decoration:underline}
+    .event-detail{font-size:12px;color:var(--muted);margin-top:1px}
+    .sources-bar{margin-top:12px;padding-top:10px;border-top:1px solid var(--border);font-size:12px;color:var(--muted)}
+    .sources-bar a{color:var(--c-events);text-decoration:none}
 
-    /* HEADLINES */
-    .headline-row{display:flex;gap:10px;border-bottom:1px solid var(--border);padding:8px 0;align-items:flex-start}
-    .headline-num{font-family:'Oswald',sans-serif;font-size:20px;color:var(--red);font-weight:700;min-width:28px;line-height:1;padding-top:2px}
-    .headline-text{font-size:15px;color:var(--text);line-height:1.55}
-    .headline-text a{color:#E8C97A;text-decoration:none}
-    .headline-text a:hover{color:#fff;text-decoration:underline}
+    /* ── FACTS ── */
+    .fact-box{background:var(--mid);border-left:3px solid var(--c-facts);border-radius:0 8px 8px 0;padding:12px 14px;font-size:14px;color:var(--text);line-height:1.6;margin-bottom:10px}
+    .fact-box:last-child{margin-bottom:0}
 
-    /* TRENDING */
-    .tag-cloud{display:flex;flex-wrap:wrap;gap:8px}
-    .tag{background:var(--mid);border:1px solid var(--red);border-radius:20px;padding:6px 14px;font-size:14px;color:var(--gold)}
+    /* ── SPORTS ── */
+    .sports-game{display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px}
+    .sports-game:last-child{border-bottom:none}
+    .sports-team{min-width:80px;font-weight:600}
+    .sports-status{font-family:'Courier Prime',monospace;font-size:11px;color:var(--muted);text-align:center;flex:1}
+    .sports-live{color:var(--on-air)}
 
-    /* FACTS */
-    .fact-box{background:var(--mid);border-left:4px solid var(--gold);border-radius:0 8px 8px 0;padding:14px 16px;font-size:15px;color:var(--text);line-height:1.7;margin-bottom:12px}
-
-    .source-credit{font-size:11px;color:var(--muted);font-family:'Courier Prime',monospace;margin-top:12px;padding-top:10px;border-top:1px solid var(--border)}
-    .last-updated{font-family:'Courier Prime',monospace;font-size:10px;color:var(--border);letter-spacing:.5px;margin-top:0}
-    #refresh-all-btn.refreshing{background:#666;cursor:not-allowed}
-
-    footer{text-align:center;padding:18px;color:var(--border);font-family:'Courier Prime',monospace;font-size:11px;letter-spacing:1px;border-top:1px solid var(--border);margin-top:8px}
+    /* ── FOOTER ── */
+    footer{text-align:center;padding:16px;color:var(--dim);font-family:'Courier Prime',monospace;font-size:11px;letter-spacing:1px;border-top:1px solid var(--border);margin-top:4px}
     footer span{color:var(--red)}
-
-    @media(max-width:600px){.grid{padding:12px;gap:12px}header{padding:10px 14px}}
   </style>
 </head>
 <body>
 
 <header>
   <div class="header-left">
-    <div class="on-air-dot"></div>
+    <div class="on-air-pip">
+      <div class="on-air-dot"></div>
+      <div class="on-air-label">ON AIR</div>
+    </div>
     <div>
       <div class="station-name"><span>92.1</span> WVTK</div>
-      <div class="tagline">Addison County's Radio Station · Show Prep Dashboard</div>
+      <div class="tagline">Addison County's Radio Station</div>
     </div>
   </div>
-  <div id="clock">--:-- --</div>
+  <div class="header-center">
+    <div id="clock">--:-- --</div>
+    <div id="date-display">Loading…</div>
+  </div>
   <button id="refresh-all-btn" onclick="refreshAll()">⟳ Refresh All</button>
 </header>
 
 <div class="grid">
 
-  <!-- Weather: full width -->
-  <div class="card wide">
+  <!-- WEATHER: full width -->
+  <div class="card span4" style="--accent:var(--c-weather)">
     <div class="card-header">
-      <div class="card-title">🌤 Middlebury, VT — Weather Forecast</div>
-      <button class="refresh-btn" onclick="loadWeather()">↻ Refresh</button>
+      <div class="card-title" style="color:var(--c-weather)">🌤 Middlebury, VT — Weather Forecast</div>
+      <button class="refresh-btn" onclick="loadWeather()" title="Refresh">↻</button>
     </div>
     <div class="card-body" id="body-weather"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
   </div>
 
-  <!-- Col 1: Today in History + Celebrity Birthdays -->
-  <div class="card">
+  <!-- ROW 2: Local News | Music News | Trending | Sports -->
+  <div class="card span2" style="--accent:var(--c-news)">
     <div class="card-header">
-      <div class="card-title">📅 Today in History</div>
-      <button class="refresh-btn" onclick="loadHistory()">↻ Refresh</button>
-    </div>
-    <div class="card-body" id="body-history"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
-  </div>
-
-  <!-- Col 2: Local News + Music News -->
-  <div class="card">
-    <div class="card-header">
-      <div class="card-title">📰 Local News</div>
-      <button class="refresh-btn" onclick="loadNews()">↻ Refresh</button>
+      <div class="card-title" style="color:var(--c-news)">📰 Local News</div>
+      <button class="refresh-btn" onclick="loadNews()" title="Refresh">↻</button>
     </div>
     <div class="card-body" id="body-news"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
   </div>
 
-  <!-- Col 3: Community Calendar -->
-  <div class="card">
+  <div class="card" style="--accent:var(--c-music)">
     <div class="card-header">
-      <div class="card-title">📌 Community Calendar</div>
-      <button class="refresh-btn" onclick="loadEvents()">↻ Refresh</button>
-    </div>
-    <div class="card-body" id="body-events"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
-  </div>
-
-  <!-- Col 1 continued: Celebrity Birthdays -->
-  <div class="card">
-    <div class="card-header">
-      <div class="card-title">🎂 Celebrity Birthdays Today</div>
-      <button class="refresh-btn" onclick="loadBirthdays()">↻ Refresh</button>
-    </div>
-    <div class="card-body" id="body-birthdays"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
-  </div>
-
-  <!-- Col 2 continued: Music News -->
-  <div class="card">
-    <div class="card-header">
-      <div class="card-title">🎸 Music News</div>
-      <button class="refresh-btn" onclick="loadMusicNews()">↻ Refresh</button>
+      <div class="card-title" style="color:var(--c-music)">🎸 Music News</div>
+      <button class="refresh-btn" onclick="loadMusicNews()" title="Refresh">↻</button>
     </div>
     <div class="card-body" id="body-musicnews"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
   </div>
 
-  <!-- What's Trending -->
-  <div class="card">
+  <div class="card" style="--accent:var(--c-trend)">
     <div class="card-header">
-      <div class="card-title">🔥 What's Trending</div>
-      <button class="refresh-btn" onclick="loadTrending()">↻ Refresh</button>
+      <div class="card-title" style="color:var(--c-trend)">🔥 Trending</div>
+      <button class="refresh-btn" onclick="loadTrending()" title="Refresh">↻</button>
     </div>
     <div class="card-body" id="body-trending"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
   </div>
 
-  <!-- Random Facts -->
-  <div class="card">
+  <!-- ROW 3: History | Birthdays | Events | National Day -->
+  <div class="card" style="--accent:var(--c-history)">
     <div class="card-header">
-      <div class="card-title">💡 Random Facts</div>
-      <button class="refresh-btn" onclick="loadFacts()">↻ Refresh</button>
+      <div class="card-title" style="color:var(--c-history)">📅 Today in History</div>
+      <button class="refresh-btn" onclick="loadHistory()" title="Refresh">↻</button>
     </div>
-    <div class="card-body" id="body-facts"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
+    <div class="card-body" id="body-history"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
   </div>
 
-
-  <!-- Sports Scores -->
-  <div class="card">
+  <div class="card" style="--accent:var(--c-birth)">
     <div class="card-header">
-      <div class="card-title">🏆 Sports Scores &amp; Schedule</div>
-      <button class="refresh-btn" onclick="loadSports()">↻ Refresh</button>
+      <div class="card-title" style="color:var(--c-birth)">🎂 Birthdays</div>
+      <button class="refresh-btn" onclick="loadBirthdays()" title="Refresh">↻</button>
     </div>
-    <div class="card-body" id="body-sports"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
+    <div class="card-body" id="body-birthdays"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
   </div>
 
-  <!-- Sunrise/Sunset + Gas + Lottery -->
-  <div class="card">
+  <div class="card" style="--accent:var(--c-events)">
     <div class="card-header">
-      <div class="card-title">🌅 Sunrise · 🎟 Lottery</div>
-      <button class="refresh-btn" onclick="loadDailyExtras()">↻ Refresh</button>
+      <div class="card-title" style="color:var(--c-events)">📌 Community Calendar</div>
+      <button class="refresh-btn" onclick="loadEvents()" title="Refresh">↻</button>
     </div>
-    <div class="card-body" id="body-extras"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
+    <div class="card-body" id="body-events"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
   </div>
 
-  <!-- National Day Calendar -->
-  <div class="card">
+  <div class="card" style="--accent:var(--c-national)">
     <div class="card-header">
-      <div class="card-title">📆 National Day Calendar</div>
-      <button class="refresh-btn" onclick="loadNationalDay()">↻ Refresh</button>
+      <div class="card-title" style="color:var(--c-national)">📆 National Days</div>
+      <button class="refresh-btn" onclick="loadNationalDay()" title="Refresh">↻</button>
     </div>
     <div class="card-body" id="body-nationalday"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
   </div>
 
-  <!-- Road & Traffic -->
-  <div class="card">
+  <!-- ROW 4: Sports | Sunrise+Lottery | Facts | Word of Day -->
+  <div class="card span2" style="--accent:var(--c-sports)">
     <div class="card-header">
-      <div class="card-title">🚗 VT Road &amp; Traffic</div>
-      <button class="refresh-btn" onclick="loadTraffic()">↻ Refresh</button>
+      <div class="card-title" style="color:var(--c-sports)">🏆 Sports</div>
+      <button class="refresh-btn" onclick="loadSports()" title="Refresh">↻</button>
     </div>
-    <div class="card-body" id="body-traffic"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
+    <div class="card-body" id="body-sports"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
   </div>
 
-  <!-- Word / Phrase of the Day -->
-  <div class="card">
+  <div class="card" style="--accent:var(--c-lottery)">
     <div class="card-header">
-      <div class="card-title">💬 Word &amp; Phrase of the Day</div>
-      <button class="refresh-btn" onclick="loadWordOfDay()">↻ Refresh</button>
+      <div class="card-title" style="color:var(--c-lottery)">🌅 Sunrise · 🎟 Lottery</div>
+      <button class="refresh-btn" onclick="loadDailyExtras()" title="Refresh">↻</button>
+    </div>
+    <div class="card-body" id="body-extras"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
+  </div>
+
+  <div class="card" style="--accent:var(--c-facts)">
+    <div class="card-header">
+      <div class="card-title" style="color:var(--c-facts)">💡 Random Facts</div>
+      <button class="refresh-btn" onclick="loadFacts()" title="Refresh">↻</button>
+    </div>
+    <div class="card-body" id="body-facts"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
+  </div>
+
+  <!-- Word of Day: full width -->
+  <div class="card span4" style="--accent:var(--c-word)">
+    <div class="card-header">
+      <div class="card-title" style="color:var(--c-word)">💬 Word &amp; Phrase of the Day</div>
+      <button class="refresh-btn" onclick="loadWordOfDay()" title="Refresh">↻</button>
     </div>
     <div class="card-body" id="body-wordofday"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
   </div>
@@ -270,6 +304,8 @@ function updateClock(){
   const n=new Date();
   document.getElementById('clock').textContent=
     n.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  document.getElementById('date-display').textContent=
+    n.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
 }
 setInterval(updateClock,1000); updateClock();
 
@@ -1378,55 +1414,6 @@ async function loadNationalDay(){
 }
 
 /* ══════════════════════════════════════════
-   VT ROAD & TRAFFIC — Resource links
-   No public browser-accessible live feed exists for VT road incidents.
-   Card provides the best direct resources for on-air use.
-══════════════════════════════════════════ */
-async function loadTraffic(){
-  setLoading('body-traffic');
-  try {
-    const html=`
-      <div style="font-size:13px;color:var(--text);line-height:1.8;margin-bottom:14px">
-        <div style="margin-bottom:6px">📞 Call <strong style="font-size:16px;color:var(--gold)">511</strong> from any VT phone for live conditions</div>
-        <div style="font-size:12px;color:var(--muted)">Available 24/7 · Route 7, US-2, I-89, I-91 and all state roads</div>
-      </div>
-
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
-        <a href="https://newengland511.org/region/Vermont" target="_blank"
-           style="background:var(--mid);border:1px solid var(--border);border-radius:8px;padding:10px 12px;text-decoration:none;display:block">
-          <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px">Live Map</div>
-          <div style="font-size:13px;color:var(--text);font-weight:600">🗺 NE 511 Vermont</div>
-        </a>
-        <a href="https://newengland511.org/List/Alerts" target="_blank"
-           style="background:var(--mid);border:1px solid var(--border);border-radius:8px;padding:10px 12px;text-decoration:none;display:block">
-          <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px">Incidents</div>
-          <div style="font-size:13px;color:var(--text);font-weight:600">🚧 Current Alerts</div>
-        </a>
-        <a href="https://vtransparency.vermont.gov/pages/Current%20Conditions" target="_blank"
-           style="background:var(--mid);border:1px solid var(--border);border-radius:8px;padding:10px 12px;text-decoration:none;display:block">
-          <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px">State Roads</div>
-          <div style="font-size:13px;color:var(--text);font-weight:600">🏔 VTrans Conditions</div>
-        </a>
-        <a href="https://newengland511.org/cctv" target="_blank"
-           style="background:var(--mid);border:1px solid var(--border);border-radius:8px;padding:10px 12px;text-decoration:none;display:block">
-          <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px">Visual Check</div>
-          <div style="font-size:13px;color:var(--text);font-weight:600">📷 Road Cameras</div>
-        </a>
-      </div>
-
-      <div style="border-top:1px solid var(--border);padding-top:10px;display:flex;align-items:center;gap:10px">
-        <a href="https://x.com/511VT" target="_blank"
-           style="background:var(--mid);border:1px solid var(--border);border-radius:6px;padding:6px 12px;text-decoration:none;font-size:13px;color:var(--text)">𝕏 @511VT</a>
-        <span style="font-size:12px;color:var(--muted)">Posts live incidents as they happen</span>
-      </div>
-
-      <div class="source-credit">newengland511.org · vtransparency.vermont.gov · @511VT</div>`;
-
-    document.getElementById('body-traffic').innerHTML=stampUpdated(html);
-  } catch(e){ setError('body-traffic',e.message); }
-}
-
-/* ══════════════════════════════════════════
    WORD & PHRASE OF THE DAY
    Word: api.wordnik.com free / fallback: wordoftheday RSS
    Phrase: Merriam-Webster Word of the Day RSS
@@ -1626,8 +1613,7 @@ function refreshAll(){
   const all=[
     loadWeather(), loadHistory(), loadBirthdays(), loadEvents(),
     loadMusicNews(), loadNews(), loadTrending(), loadFacts(),
-    loadSports(), loadDailyExtras(), loadNationalDay(),
-    loadTraffic(), loadWordOfDay()
+    loadSports(), loadDailyExtras(), loadNationalDay(), loadWordOfDay()
   ];
   Promise.allSettled(all).then(()=>{
     btn.textContent='⟳ Refresh All';
