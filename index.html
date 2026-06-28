@@ -1185,99 +1185,84 @@ async function loadDailyExtras(){
       }
     } catch(e){}
 
-    // ── Lottery — Claude AI fetches winning numbers + jackpots via web search ──
-    html+=`<div class="item"><div class="item-label">🎟 Lottery — Most Recent Winning Numbers</div>`;
+    // ── Lottery — Google News RSS for winning numbers + jackpots ──
+    // Uses the same fetchRSS proxy chain that works for all other cards
+    html+=`<div class="item"><div class="item-label">🎟 Lottery — Winning Numbers &amp; Jackpots</div>`;
 
     // Next draw day helpers
     function nextDrawDay(drawDays){
       const now=new Date();
       const today=now.getDay();
       let minDiff=8;
-      drawDays.forEach(d=>{
-        let diff=(d-today+7)%7;
-        if(diff===0) diff=7;
-        if(diff<minDiff) minDiff=diff;
-      });
+      drawDays.forEach(d=>{ let diff=(d-today+7)%7; if(diff===0) diff=7; if(diff<minDiff) minDiff=diff; });
       const next=new Date(now); next.setDate(now.getDate()+minDiff);
       return next.toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'});
     }
     const pbNextDraw=nextDrawDay([1,3,6]); // Mon, Wed, Sat
     const mmNextDraw=nextDrawDay([2,5]);   // Tue, Fri
 
-    try {
-      const aiRes=await fetch('https://api.anthropic.com/v1/messages',{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({
-          model:'claude-sonnet-4-6',
-          max_tokens:600,
-          tools:[{type:'web_search_20250305',name:'web_search'}],
-          messages:[{role:'user',content:`Search for the most recent Powerball and Mega Millions winning numbers and current jackpot estimates. Return ONLY a JSON object like this, no markdown, no explanation:
-{"pb_date":"Mon, Jun 23","pb_numbers":"5 12 22 38 52","pb_ball":"14","pb_play":"2","pb_jackpot":"$327 Million","mm_date":"Fri, Jun 20","mm_numbers":"3 17 27 48 55","mm_ball":"9","mm_mega":"3","mm_jackpot":"$45 Million"}`}]
-        })
-      });
-      if(!aiRes.ok) throw new Error('AI API '+aiRes.status);
-      const aiData=await aiRes.json();
-      const textBlock=[...aiData.content].reverse().find(b=>b.type==='text');
-      if(!textBlock) throw new Error('No text in AI response');
-      const clean=textBlock.text.replace(/```json|```/g,'').trim();
-      const j=JSON.parse(clean);
+    // Fetch Powerball and Mega Millions news via Google News RSS
+    const [pbRss, mmRss] = await Promise.allSettled([
+      fetchRSS('https://news.google.com/rss/search?q=Powerball+winning+numbers+jackpot&hl=en-US&gl=US&ceid=US:en'),
+      fetchRSS('https://news.google.com/rss/search?q=Mega+Millions+winning+numbers+jackpot&hl=en-US&gl=US&ceid=US:en'),
+    ]);
 
-      const whites_pb=(j.pb_numbers||'').trim().split(/\s+/);
-      const whites_mm=(j.mm_numbers||'').trim().split(/\s+/);
-
-      html+=`<div style="margin-top:10px">
-        <div style="font-size:12px;font-weight:600;color:#fff;margin-bottom:2px">🔴 Powerball</div>
-        <div style="font-size:11px;color:var(--muted);margin-bottom:5px">${j.pb_date||''}${j.pb_play?' · Power Play: '+j.pb_play+'x':''}</div>
-        <div>${ballHTML(whites_pb,j.pb_ball||'','#C8102E')}</div>
-        <div style="font-size:10px;color:var(--muted);margin-top:4px">White balls &nbsp;·&nbsp; <span style="color:#C8102E;font-weight:700">●</span> Powerball</div>
-        <div style="margin-top:8px;display:flex;gap:10px;flex-wrap:wrap">
-          <div style="background:var(--mid);border-radius:6px;padding:6px 10px;flex:1;min-width:120px">
-            <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Next Drawing</div>
-            <div style="font-family:'Oswald',sans-serif;font-size:14px;color:var(--gold)">${pbNextDraw}</div>
-          </div>
-          <div style="background:var(--mid);border-radius:6px;padding:6px 10px;flex:1;min-width:120px">
-            <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Est. Jackpot</div>
-            <div style="font-family:'Oswald',sans-serif;font-size:16px;font-weight:700;color:#3CBA6E">
-              <a href="https://www.powerball.com" target="_blank" style="color:#3CBA6E;text-decoration:none">${j.pb_jackpot||'powerball.com →'}</a>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
-        <div style="font-size:12px;font-weight:600;color:#fff;margin-bottom:2px">🔵 Mega Millions</div>
-        <div style="font-size:11px;color:var(--muted);margin-bottom:5px">${j.mm_date||''}${j.mm_mega?' · Megaplier: '+j.mm_mega+'x':''}</div>
-        <div>${ballHTML(whites_mm,j.mm_ball||'','#003DA5')}</div>
-        <div style="font-size:10px;color:var(--muted);margin-top:4px">White balls &nbsp;·&nbsp; <span style="color:#003DA5;font-weight:700">●</span> Mega Ball</div>
-        <div style="margin-top:8px;display:flex;gap:10px;flex-wrap:wrap">
-          <div style="background:var(--mid);border-radius:6px;padding:6px 10px;flex:1;min-width:120px">
-            <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Next Drawing</div>
-            <div style="font-family:'Oswald',sans-serif;font-size:14px;color:var(--gold)">${mmNextDraw}</div>
-          </div>
-          <div style="background:var(--mid);border-radius:6px;padding:6px 10px;flex:1;min-width:120px">
-            <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Est. Jackpot</div>
-            <div style="font-family:'Oswald',sans-serif;font-size:16px;font-weight:700;color:#3CBA6E">
-              <a href="https://www.megamillions.com" target="_blank" style="color:#3CBA6E;text-decoration:none">${j.mm_jackpot||'megamillions.com →'}</a>
-            </div>
-          </div>
-        </div>
-      </div>`;
-
-    } catch(e){
-      html+=`<div style="color:var(--muted);font-size:13px;padding:10px 0">Could not load lottery numbers. Check official sites below.</div>`;
+    // Helper: extract dollar amount from headline text e.g. "$327 million" or "$1.2 billion"
+    function extractJackpot(text){
+      const m=text.match(/\$[\d,.]+\s*(million|billion)/i);
+      if(!m) return '';
+      return m[0].replace(/\s+/g,' ').replace(/(\d),(\d)/g,'$1,$2');
     }
 
-    // Always show quick links for VT Megabucks
-    html+=`<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <a href="https://www.powerball.com" target="_blank" style="background:var(--mid);border:1px solid var(--border);border-radius:6px;padding:6px 10px;text-decoration:none;font-size:12px;color:var(--text)">🔴 Powerball →</a>
-        <a href="https://www.megamillions.com" target="_blank" style="background:var(--mid);border:1px solid var(--border);border-radius:6px;padding:6px 10px;text-decoration:none;font-size:12px;color:var(--text)">🔵 Mega Millions →</a>
-        <a href="https://vtlottery.com/games/megabucks" target="_blank" style="background:var(--mid);border:1px solid var(--border);border-radius:6px;padding:6px 10px;text-decoration:none;font-size:12px;color:var(--text)">🟢 VT Megabucks →</a>
-      </div>
+    function renderLotteryGame(rssResult, color, label, ballColor, nextDraw, officialUrl){
+      let jackpot='', headline='', headlineUrl='', dateStr='';
+      if(rssResult.status==='fulfilled'){
+        const items=Array.from(rssResult.value.querySelectorAll('item'));
+        for(const item of items.slice(0,5)){
+          const title=strip(item.querySelector('title')?.textContent||'');
+          const link=(item.querySelector('guid')?.textContent||item.querySelector('link')?.textContent||'').trim();
+          const pub=fmt(item.querySelector('pubDate')?.textContent||'');
+          const j=extractJackpot(title);
+          if(j&&!jackpot){ jackpot=j; }
+          if(!headline&&title){ headline=title; headlineUrl=link; dateStr=pub; }
+        }
+      }
+
+      return `<div style="margin-top:10px">
+        <div style="font-size:12px;font-weight:600;color:#fff;margin-bottom:6px">${label}</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px">
+          <div style="background:var(--mid);border-radius:6px;padding:6px 10px;flex:1;min-width:110px">
+            <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Next Drawing</div>
+            <div style="font-family:'Oswald',sans-serif;font-size:13px;color:var(--gold)">${nextDraw}</div>
+          </div>
+          <div style="background:var(--mid);border-radius:6px;padding:6px 10px;flex:1;min-width:110px">
+            <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Est. Jackpot</div>
+            <div style="font-family:'Oswald',sans-serif;font-size:15px;font-weight:700;color:#3CBA6E">
+              ${jackpot
+                ? `<a href="${officialUrl}" target="_blank" style="color:#3CBA6E;text-decoration:none">${jackpot}</a>`
+                : `<a href="${officialUrl}" target="_blank" style="color:var(--muted);font-size:12px;text-decoration:none">${officialUrl.replace('https://www.','').replace('https://','')} →</a>`}
+            </div>
+          </div>
+        </div>
+        ${headline ? `<div style="font-size:12px;color:var(--muted);line-height:1.5">
+          ${headlineUrl?`<a href="${headlineUrl}" target="_blank" style="color:#E8C97A;text-decoration:none">${headline}</a>`:headline}
+          ${dateStr?`<span style="color:var(--border)"> · ${dateStr}</span>`:''}
+        </div>` : ''}
+      </div>`;
+    }
+
+    html+=renderLotteryGame(pbRss,'#C8102E','🔴 Powerball','#C8102E',pbNextDraw,'https://www.powerball.com');
+    html+=`<div style="border-top:1px solid var(--border);margin:10px 0"></div>`;
+    html+=renderLotteryGame(mmRss,'#003DA5','🔵 Mega Millions','#003DA5',mmNextDraw,'https://www.megamillions.com');
+
+    html+=`<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+      <a href="https://www.powerball.com" target="_blank" style="background:var(--mid);border:1px solid var(--border);border-radius:6px;padding:5px 10px;text-decoration:none;font-size:12px;color:var(--text)">🔴 Powerball →</a>
+      <a href="https://www.megamillions.com" target="_blank" style="background:var(--mid);border:1px solid var(--border);border-radius:6px;padding:5px 10px;text-decoration:none;font-size:12px;color:var(--text)">🔵 Mega Millions →</a>
+      <a href="https://vtlottery.com/games/megabucks" target="_blank" style="background:var(--mid);border:1px solid var(--border);border-radius:6px;padding:5px 10px;text-decoration:none;font-size:12px;color:var(--text)">🟢 VT Megabucks →</a>
     </div>`;
 
     html+=`</div>`; // close lottery item
-    html+='<div class="source-credit">Sources: sunrise-sunset.org · Powerball · MegaMillions (via web search)</div>';
+    html+='<div class="source-credit">Sources: sunrise-sunset.org · Google News (Powerball · Mega Millions)</div>';
     document.getElementById('body-extras').innerHTML=stampUpdated(html);
   } catch(e){ setError('body-extras',e.message); }
 }
@@ -1333,67 +1318,44 @@ async function loadNationalDay(){
 }
 
 /* ══════════════════════════════════════════
-   VT ROAD & TRAFFIC — Claude AI fetches current VT incidents
-   via web search (newengland511.org / @511VT), plus working links
+   VT ROAD & TRAFFIC
+   Google News RSS for VT road incidents + working newengland511 links
 ══════════════════════════════════════════ */
 async function loadTraffic(){
   setLoading('body-traffic');
   try {
     let html='';
+    let gotItems=false;
 
-    // Ask Claude AI to search for current VT road incidents
+    // Google News RSS search for VT road conditions — works through existing fetchRSS proxies
     try {
-      const aiRes=await fetch('https://api.anthropic.com/v1/messages',{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({
-          model:'claude-sonnet-4-6',
-          max_tokens:800,
-          tools:[{type:'web_search_20250305',name:'web_search'}],
-          messages:[{role:'user',content:`Search for current Vermont road conditions, closures, and traffic incidents today — especially on US Route 7, Route 2, and in Addison County. Check newengland511.org and @511VT. Return ONLY a JSON object, no markdown:
-{"updated":"time or date found","incidents":[{"route":"US-7","location":"Middlebury","type":"Construction","detail":"Lane closure near Exit 3"},{"route":"VT-125","location":"Middlebury","type":"Clear","detail":"No incidents reported"}],"summary":"One sentence overall status for Addison County"}
-If no incidents found, return incidents as empty array and summary saying roads are clear.`}]
-        })
-      });
-
-      if(aiRes.ok){
-        const aiData=await aiRes.json();
-        const textBlock=[...aiData.content].reverse().find(b=>b.type==='text');
-        if(textBlock&&textBlock.text){
-          const clean=textBlock.text.replace(/```json|```/g,'').trim();
-          const d=JSON.parse(clean);
-
-          if(d.summary){
-            html+=`<div style="background:var(--mid);border-left:4px solid var(--gold);border-radius:0 8px 8px 0;padding:10px 14px;margin-bottom:12px;font-size:14px;color:var(--text)">${d.summary}</div>`;
-          }
-
-          if(d.incidents&&d.incidents.length>0){
-            d.incidents.forEach(inc=>{
-              const isClear=(inc.type||'').toLowerCase().includes('clear')||
-                            (inc.detail||'').toLowerCase().includes('no incident')||
-                            (inc.detail||'').toLowerCase().includes('clear');
-              html+=`<div class="item">
-                <div class="item-label" style="color:${isClear?'var(--green)':'var(--red)'}">
-                  ${isClear?'✅':'🚧'} ${inc.route||''} · ${inc.type||''}
-                </div>
-                <div class="item-title" style="font-size:14px">${inc.location||''}</div>
-                ${inc.detail?`<div class="item-body">${inc.detail}</div>`:''}
-              </div>`;
-            });
-          } else {
-            html+=`<div style="color:var(--green);font-size:14px;padding:8px 0">✅ No active incidents reported in Addison County</div>`;
-          }
-
-          if(d.updated){
-            html+=`<div class="item-meta" style="margin-top:6px">Source checked: ${d.updated}</div>`;
-          }
-        }
+      const xml=await fetchRSS('https://news.google.com/rss/search?q=Vermont+road+closure+OR+accident+OR+traffic+Route+7+OR+Route+2+OR+Addison&hl=en-US&gl=US&ceid=US:en');
+      const items=Array.from(xml.querySelectorAll('item')).slice(0,6);
+      if(items.length>0){
+        gotItems=true;
+        items.forEach(item=>{
+          const title=strip(item.querySelector('title')?.textContent||'');
+          const link=(item.querySelector('guid')?.textContent||item.querySelector('link')?.textContent||'').trim();
+          const pub=fmt(item.querySelector('pubDate')?.textContent||'');
+          const publisher=item.querySelector('source')?.textContent?.trim()||'';
+          if(!title) return;
+          html+=`<div style="padding:7px 0;border-bottom:1px solid var(--border)">
+            <div style="font-size:14px;line-height:1.45;margin-bottom:2px">
+              ${link?`<a href="${link}" target="_blank" style="color:#E8C97A;text-decoration:none">${title}</a>`:title}
+            </div>
+            <div style="font-family:'Courier Prime',monospace;font-size:10px;color:var(--border)">
+              ${publisher?publisher+' · ':''}${pub}
+            </div>
+          </div>`;
+        });
       }
-    } catch(e){
-      html+=`<div style="color:var(--muted);font-size:13px;padding:8px 0">Could not retrieve live traffic data. Use the links below for current conditions.</div>`;
+    } catch(e){}
+
+    if(!gotItems){
+      html+=`<div style="color:var(--green);font-size:14px;padding:8px 0">✅ No road incidents currently in the news for Addison County / Route 7</div>`;
     }
 
-    // Working links — verified correct URLs
+    // Verified working links
     html+=`<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
       <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Live Resources</div>
       <div style="display:flex;flex-wrap:wrap;gap:8px">
@@ -1401,18 +1363,18 @@ If no incidents found, return incidents as empty array and summary saying roads 
            style="background:var(--mid);border:1px solid var(--border);border-radius:6px;padding:7px 12px;text-decoration:none;font-size:13px;color:var(--text)">🗺 NE 511 VT Map</a>
         <a href="https://newengland511.org/List/Alerts" target="_blank"
            style="background:var(--mid);border:1px solid var(--border);border-radius:6px;padding:7px 12px;text-decoration:none;font-size:13px;color:var(--text)">🚧 Current Alerts</a>
-        <a href="https://newengland511.org/region/messages" target="_blank"
-           style="background:var(--mid);border:1px solid var(--border);border-radius:6px;padding:7px 12px;text-decoration:none;font-size:13px;color:var(--text)">📋 Road Messages</a>
         <a href="https://vtransparency.vermont.gov/pages/Current%20Conditions" target="_blank"
            style="background:var(--mid);border:1px solid var(--border);border-radius:6px;padding:7px 12px;text-decoration:none;font-size:13px;color:var(--text)">🏔 VTrans Conditions</a>
+        <a href="https://newengland511.org/region/messages" target="_blank"
+           style="background:var(--mid);border:1px solid var(--border);border-radius:6px;padding:7px 12px;text-decoration:none;font-size:13px;color:var(--text)">📋 Road Messages</a>
       </div>
       <div style="margin-top:10px;font-size:12px;color:var(--muted)">
-        📞 Call <strong style="color:var(--text)">511</strong> from any VT phone · 
-        Follow <a href="https://x.com/511VT" target="_blank" style="color:var(--gold)">@511VT</a> on X for live updates
+        📞 Call <strong style="color:var(--text)">511</strong> from any VT phone ·
+        Follow <a href="https://x.com/511VT" target="_blank" style="color:var(--gold)">@511VT</a> for live updates
       </div>
     </div>`;
 
-    html+='<div class="source-credit">Sources: newengland511.org · VTrans · @511VT</div>';
+    html+='<div class="source-credit">Sources: Google News · newengland511.org · VTrans</div>';
     document.getElementById('body-traffic').innerHTML=stampUpdated(html);
   } catch(e){ setError('body-traffic',e.message); }
 }
