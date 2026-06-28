@@ -117,6 +117,8 @@
     .fact-box{background:var(--mid);border-left:4px solid var(--gold);border-radius:0 8px 8px 0;padding:14px 16px;font-size:15px;color:var(--text);line-height:1.7;margin-bottom:12px}
 
     .source-credit{font-size:11px;color:var(--muted);font-family:'Courier Prime',monospace;margin-top:12px;padding-top:10px;border-top:1px solid var(--border)}
+    .last-updated{font-family:'Courier Prime',monospace;font-size:10px;color:var(--border);letter-spacing:.5px;margin-top:0}
+    #refresh-all-btn.refreshing{background:#666;cursor:not-allowed}
 
     footer{text-align:center;padding:18px;color:var(--border);font-family:'Courier Prime',monospace;font-size:11px;letter-spacing:1px;border-top:1px solid var(--border);margin-top:8px}
     footer span{color:var(--red)}
@@ -240,6 +242,24 @@
     <div class="card-body" id="body-nationalday"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
   </div>
 
+  <!-- Road & Traffic -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">🚗 VT Road &amp; Traffic</div>
+      <button class="refresh-btn" onclick="loadTraffic()">↻ Refresh</button>
+    </div>
+    <div class="card-body" id="body-traffic"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
+  </div>
+
+  <!-- Word / Phrase of the Day -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">💬 Word &amp; Phrase of the Day</div>
+      <button class="refresh-btn" onclick="loadWordOfDay()">↻ Refresh</button>
+    </div>
+    <div class="card-body" id="body-wordofday"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
+  </div>
+
 </div>
 
 <footer>92.1 WVTK · <span>Addison County's Radio Station</span> · Show Prep Dashboard</footer>
@@ -334,6 +354,10 @@ function setLoading(id){
 }
 function setError(id,msg){
   document.getElementById(id).innerHTML=`<div class="error-state">⚠ ${msg}</div>`;
+}
+function stampUpdated(html){
+  const t=new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  return html+`<div class="last-updated">Updated ${t}</div>`;
 }
 function strip(html){
   return (html||'').replace(/<[^>]+>/g,'').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&nbsp;/g,' ').trim();
@@ -478,7 +502,7 @@ async function loadWeather(){
       </div>`;
     });
     html+='</div><div class="source-credit">Open-Meteo.com · NWS Alerts · Middlebury VT · Updated hourly</div>';
-    document.getElementById('body-weather').innerHTML=html;
+    document.getElementById('body-weather').innerHTML=stampUpdated(html);
   } catch(e){ setError('body-weather',e.message); }
 }
 
@@ -547,7 +571,7 @@ async function loadHistory(){
       </div>`;
     });
     html+='<div class="source-credit">Source: Wikipedia On This Day API</div>';
-    document.getElementById('body-history').innerHTML=html;
+    document.getElementById('body-history').innerHTML=stampUpdated(html);
   } catch(e){ setError('body-history',e.message); }
 }
 
@@ -665,7 +689,7 @@ async function loadBirthdays(){
     }
 
     document.getElementById('body-birthdays').innerHTML=
-      renderBirthdays(notable)+'<div class="source-credit">Source: Wikipedia On This Day API</div>';
+      stampUpdated(renderBirthdays(notable)+'<div class="source-credit">Source: Wikipedia On This Day API</div>');
   } catch(e){ setError('body-birthdays',e.message); }
 }
 
@@ -729,7 +753,7 @@ async function loadEvents(){
     });
 
     html+=sourcesBar();
-    document.getElementById('body-events').innerHTML=html;
+    document.getElementById('body-events').innerHTML=stampUpdated(html);
   } catch(e){
     // Fallback: show links to both sources
     document.getElementById('body-events').innerHTML=
@@ -805,7 +829,7 @@ async function loadMusicNews(){
       </div>`;
     });
     html+='<div class="source-credit">Sources: <a href="https://www.rttnews.com/list/classic-rock-music.aspx" target="_blank" style="color:var(--gold)">RTTNews Classic Rock</a> · Ultimate Classic Rock</div>';
-    document.getElementById('body-musicnews').innerHTML=html;
+    document.getElementById('body-musicnews').innerHTML=stampUpdated(html);
   } catch(e){ setError('body-musicnews',e.message); }
 }
 
@@ -854,7 +878,7 @@ async function loadNews(){
       </div>`;
     });
     html+='<div class="source-credit">Sources: WCAX · VT Digger</div>';
-    document.getElementById('body-news').innerHTML=html;
+    document.getElementById('body-news').innerHTML=stampUpdated(html);
   } catch(e){ setError('body-news',e.message); }
 }
 
@@ -911,7 +935,7 @@ async function loadTrending(){
       });
 
       html+='<div class="source-credit">Source: Google Trends — trends.google.com/trending?geo=US</div>';
-      document.getElementById('body-trending').innerHTML=html;
+      document.getElementById('body-trending').innerHTML=stampUpdated(html);
       return; // success — done
     } catch(e){ /* try next URL or fall through to backup */ }
   }
@@ -957,7 +981,7 @@ async function loadTrending(){
       </div>`;
     });
     html+='<div class="source-credit">Sources: E! Online · People · ET Online · Us Weekly</div>';
-    document.getElementById('body-trending').innerHTML=html;
+    document.getElementById('body-trending').innerHTML=stampUpdated(html);
   } catch(e){ setError('body-trending',e.message); }
 }
 
@@ -986,7 +1010,7 @@ async function loadFacts(){
       html+=`<div class="fact-box">${fact}</div>`;
     });
     html+='<div class="source-credit">Source: uselessfacts.jsph.pl</div>';
-    document.getElementById('body-facts').innerHTML=html;
+    document.getElementById('body-facts').innerHTML=stampUpdated(html);
   } catch(e){ setError('body-facts',e.message); }
 }
 
@@ -999,10 +1023,17 @@ async function loadSports(){
   try {
     const base='https://site.api.espn.com/apis/site/v2/sports';
 
-    // Build date strings
-    function espnDate(d){ return d.toISOString().slice(0,10).replace(/-/g,''); }
-    const todayDate=espnDate(TODAY);
-    const yest=new Date(TODAY); yest.setDate(yest.getDate()-1);
+    // Build date strings using LOCAL date (not UTC) to avoid midnight rollover bug
+    function espnDate(d){
+      const y=d.getFullYear();
+      const m=String(d.getMonth()+1).padStart(2,'0');
+      const day=String(d.getDate()).padStart(2,'0');
+      return `${y}${m}${day}`;
+    }
+    // Always use a fresh "now" so refresh mid-day stays accurate
+    const now=new Date();
+    const todayDate=espnDate(now);
+    const yest=new Date(now); yest.setDate(now.getDate()-1);
     const yesterdayDate=espnDate(yest);
 
     // Favorite teams filter
@@ -1066,7 +1097,7 @@ async function loadSports(){
           <strong>${na}</strong>${sa!==''?' '+sa:''}
         </span>
         <span style="font-size:10px;color:${isLive?'var(--on-air)':'var(--muted)'};font-family:'Courier Prime',monospace;text-align:center;flex:1">
-          ${isLive?'🔴 LIVE':isFinal?'Final':gameTime}<br>
+          ${isLive?`🔴 ${statusDesc||'LIVE'}`:isFinal?`Final${statusDesc&&statusDesc!=='Final'?' · '+statusDesc:''}`:gameTime}<br>
           <span style="font-size:9px;color:var(--border)">away · home</span>
         </span>
         <span style="min-width:90px;text-align:right;color:${isFinal&&home.winner?'#fff':isFinal?'var(--muted)':'var(--text)'}">
@@ -1096,7 +1127,13 @@ async function loadSports(){
       }
 
       if(tGames.length>0){
-        html+=`<div style="font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin:6px 0 3px">Today's Schedule</div>`;
+        // Count live and final games to label the section accurately
+        const liveCt=tGames.filter(ev=>ev.status?.type?.state==='in').length;
+        const finalCt=tGames.filter(ev=>ev.status?.type?.state==='post').length;
+        const sectionLabel=liveCt>0?`Today's Games — <span style="color:var(--on-air)">🔴 ${liveCt} LIVE</span>`:
+                           finalCt===tGames.length?`Today's Games — All Final`:
+                           `Today's Games`;
+        html+=`<div style="font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin:6px 0 3px">${sectionLabel}</div>`;
         tGames.slice(0,maxGames).forEach(ev=>{ html+=renderGame(ev,false); });
       }
 
@@ -1105,7 +1142,7 @@ async function loadSports(){
 
     if(!anyContent) html='<div class="item-body" style="color:var(--muted)">No games found for yesterday or today.</div>';
     html+='<div class="source-credit">Source: ESPN</div>';
-    document.getElementById('body-sports').innerHTML=html;
+    document.getElementById('body-sports').innerHTML=stampUpdated(html);
   } catch(e){ setError('body-sports',e.message); }
 }
 
@@ -1171,6 +1208,26 @@ async function loadDailyExtras(){
     // ── Lottery — NY Open Data (most reliable, always has latest draw) ──
     html+=`<div class="item"><div class="item-label">🎟 Lottery — Most Recent Winning Numbers</div>`;
 
+    // Next draw day helpers
+    function nextDrawDay(drawDays){
+      // drawDays: array of day-of-week numbers (0=Sun, 1=Mon, ... 6=Sat)
+      const now=new Date();
+      const today=now.getDay();
+      let minDiff=8;
+      drawDays.forEach(d=>{
+        let diff=(d-today+7)%7;
+        if(diff===0) diff=7; // already drew today, next is same day next week
+        if(diff<minDiff) minDiff=diff;
+      });
+      const next=new Date(now);
+      next.setDate(now.getDate()+minDiff);
+      return next.toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'});
+    }
+    // Powerball: Mon(1), Wed(3), Sat(6)
+    const pbNextDraw=nextDrawDay([1,3,6]);
+    // Mega Millions: Tue(2), Fri(5)
+    const mmNextDraw=nextDrawDay([2,5]);
+
     const [nyPbRes, nyMmRes] = await Promise.allSettled([
       fetch('https://data.ny.gov/resource/d6yy-54nr.json?$limit=1&$order=draw_date+DESC'),
       fetch('https://data.ny.gov/resource/5xaw-6ayf.json?$limit=1&$order=draw_date+DESC'),
@@ -1193,6 +1250,18 @@ async function loadDailyExtras(){
           <div style="font-size:11px;color:var(--muted);margin-bottom:5px">${dStr}${pp?' · Power Play: '+pp+'x':''}</div>
           <div>${ballHTML(whites,pb,'#C8102E')}</div>
           <div style="font-size:10px;color:var(--muted);margin-top:4px">White balls &nbsp;·&nbsp; <span style="color:#C8102E;font-weight:700">●</span> Powerball</div>
+          <div style="margin-top:8px;display:flex;gap:10px;flex-wrap:wrap">
+            <div style="background:var(--mid);border-radius:6px;padding:6px 10px;flex:1;min-width:120px">
+              <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Next Drawing</div>
+              <div style="font-family:'Oswald',sans-serif;font-size:14px;color:var(--gold)">${pbNextDraw}</div>
+            </div>
+            <div style="background:var(--mid);border-radius:6px;padding:6px 10px;flex:1;min-width:120px">
+              <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Est. Jackpot</div>
+              <div style="font-family:'Oswald',sans-serif;font-size:14px;color:#3CBA6E">
+                <a href="https://www.powerball.com" target="_blank" style="color:#3CBA6E;text-decoration:none">powerball.com →</a>
+              </div>
+            </div>
+          </div>
         </div>`;
       }
     }
@@ -1213,6 +1282,18 @@ async function loadDailyExtras(){
           <div style="font-size:11px;color:var(--muted);margin-bottom:5px">${dStr}${mp?' · Megaplier: '+mp+'x':''}</div>
           <div>${ballHTML(whites,mb,'#003DA5')}</div>
           <div style="font-size:10px;color:var(--muted);margin-top:4px">White balls &nbsp;·&nbsp; <span style="color:#003DA5;font-weight:700">●</span> Mega Ball</div>
+          <div style="margin-top:8px;display:flex;gap:10px;flex-wrap:wrap">
+            <div style="background:var(--mid);border-radius:6px;padding:6px 10px;flex:1;min-width:120px">
+              <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Next Drawing</div>
+              <div style="font-family:'Oswald',sans-serif;font-size:14px;color:var(--gold)">${mmNextDraw}</div>
+            </div>
+            <div style="background:var(--mid);border-radius:6px;padding:6px 10px;flex:1;min-width:120px">
+              <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Est. Jackpot</div>
+              <div style="font-family:'Oswald',sans-serif;font-size:14px;color:#3CBA6E">
+                <a href="https://www.megamillions.com" target="_blank" style="color:#3CBA6E;text-decoration:none">megamillions.com →</a>
+              </div>
+            </div>
+          </div>
         </div>`;
       }
     }
@@ -1229,7 +1310,7 @@ async function loadDailyExtras(){
 
     html+=`<div class="item-meta" style="margin-top:8px">Numbers: NY Open Data · Jackpots: official lottery sites</div></div>`;
     html+='<div class="source-credit">Sources: sunrise-sunset.org · data.ny.gov</div>';
-    document.getElementById('body-extras').innerHTML=html;
+    document.getElementById('body-extras').innerHTML=stampUpdated(html);
   } catch(e){ setError('body-extras',e.message); }
 }
 
@@ -1279,25 +1360,280 @@ async function loadNationalDay(){
     });
 
     html+='<div class="source-credit">Source: National Today · checkiday.com</div>';
-    document.getElementById('body-nationalday').innerHTML=html;
+    document.getElementById('body-nationalday').innerHTML=stampUpdated(html);
   } catch(e){ setError('body-nationalday',e.message); }
+}
+
+/* ══════════════════════════════════════════
+   VT ROAD & TRAFFIC — VT 511 RSS + fallback links
+══════════════════════════════════════════ */
+async function loadTraffic(){
+  setLoading('body-traffic');
+  try {
+    let html='';
+    let gotFeed=false;
+
+    // VT 511 publishes an RSS feed of incidents statewide
+    try {
+      const xml=await fetchRSS('https://www.511vt.org/api/IncidentFeed/GetIncidentFeed?regionName=VERMONT');
+      const items=Array.from(xml.querySelectorAll('item'));
+      // Filter for Addison County / US-7 / VT-125 / US-2 / local routes
+      const localTerms=['addison','middlebury','vergennes','bristol','ferrisburgh','weybridge',
+        'cornwall','waltham','route 7','us-7','vt-125','vt-17','vt-116','vt-22a','route 125','route 116'];
+      const local=items.filter(item=>{
+        const t=(item.querySelector('title')?.textContent||'').toLowerCase();
+        const d=(item.querySelector('description')?.textContent||'').toLowerCase();
+        return localTerms.some(term=>t.includes(term)||d.includes(term));
+      });
+      const show=local.length>0?local:items.slice(0,10);
+      if(show.length>0){
+        gotFeed=true;
+        if(local.length===0){
+          html+=`<div style="font-size:12px;color:var(--gold);margin-bottom:8px">⚠ No Addison County incidents — showing statewide</div>`;
+        }
+        show.slice(0,8).forEach(item=>{
+          const title=strip(item.querySelector('title')?.textContent||'');
+          const desc=strip(item.querySelector('description')?.textContent||'').slice(0,160);
+          const pubDate=fmt(item.querySelector('pubDate')?.textContent||'');
+          const link=(item.querySelector('link')?.textContent||item.querySelector('guid')?.textContent||'').trim();
+          html+=`<div class="item">
+            <div class="item-label">🚧 VT 511 · ${pubDate}</div>
+            <div class="item-title">${link?`<a href="${link}" target="_blank">${title}</a>`:title}</div>
+            ${desc?`<div class="item-body">${desc}${desc.length>=160?'…':''}</div>`:''}
+          </div>`;
+        });
+      }
+    } catch(e){}
+
+    if(!gotFeed){
+      html+=`<div style="font-size:13px;color:var(--muted);padding:4px 0 10px">No active incidents found on VT 511.</div>`;
+    }
+
+    // Always show quick-access links
+    html+=`<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+      <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Quick Links</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+        <a href="https://www.511vt.org/" target="_blank" style="background:var(--mid);border:1px solid var(--border);border-radius:6px;padding:7px 12px;text-decoration:none;font-size:13px;color:var(--text);display:flex;align-items:center;gap:5px">🗺 VT 511 Map</a>
+        <a href="https://www.511vt.org/map#alerts" target="_blank" style="background:var(--mid);border:1px solid var(--border);border-radius:6px;padding:7px 12px;text-decoration:none;font-size:13px;color:var(--text);display:flex;align-items:center;gap:5px">🚧 Incidents</a>
+        <a href="https://www.511vt.org/map#cameras" target="_blank" style="background:var(--mid);border:1px solid var(--border);border-radius:6px;padding:7px 12px;text-decoration:none;font-size:13px;color:var(--text);display:flex;align-items:center;gap:5px">📷 Cameras</a>
+        <a href="https://www.vt511.com/vt511/" target="_blank" style="background:var(--mid);border:1px solid var(--border);border-radius:6px;padding:7px 12px;text-decoration:none;font-size:13px;color:var(--text);display:flex;align-items:center;gap:5px">🚗 Route 7 Status</a>
+      </div>
+      <div style="margin-top:10px;font-size:11px;color:var(--muted)">Call <strong style="color:var(--text)">511</strong> from any phone for live VT road conditions</div>
+    </div>`;
+
+    html+='<div class="source-credit">Source: VT 511 · 511vt.org</div>';
+    document.getElementById('body-traffic').innerHTML=stampUpdated(html);
+  } catch(e){ setError('body-traffic',e.message); }
+}
+
+/* ══════════════════════════════════════════
+   WORD & PHRASE OF THE DAY
+   Word: api.wordnik.com free / fallback: wordoftheday RSS
+   Phrase: Merriam-Webster Word of the Day RSS
+══════════════════════════════════════════ */
+async function loadWordOfDay(){
+  setLoading('body-wordofday');
+  try {
+    let html='';
+
+    // ── Pronouncer helper ──
+    // Converts IPA or raw phonetic string into a radio-friendly "sounds like" guide
+    // e.g. "mə-LIF-loo-əs" → "muh-LIF-loo-us" with stressed syllable highlighted
+    function buildPronouncerHTML(raw){
+      if(!raw) return '';
+      // Strip IPA slashes/brackets and common IPA chars → plain English approximation
+      let p=raw.replace(/[\/\[\]]/g,'').trim();
+      // Common IPA → readable substitutions
+      const sub=[
+        [/ˈ/g,'|STRESS|'],[/ˌ/g,''],[/æ/g,'a'],[/ɑ/g,'ah'],[/ɔ/g,'aw'],
+        [/ə/g,'uh'],[/ɛ/g,'eh'],[/ɪ/g,'ih'],[/ʊ/g,'oo'],[/uː/g,'oo'],
+        [/iː/g,'ee'],[/aɪ/g,'eye'],[/aʊ/g,'ow'],[/oʊ/g,'oh'],[/ɔɪ/g,'oy'],
+        [/ʃ/g,'sh'],[/ʒ/g,'zh'],[/θ/g,'th'],[/ð/g,'th'],[/ŋ/g,'ng'],
+        [/tʃ/g,'ch'],[/dʒ/g,'j'],[/x/g,'kh'],[/ɹ/g,'r'],[/ː/g,''],
+      ];
+      sub.forEach(([pat,rep])=>{ p=p.replace(pat,rep); });
+
+      // Split on hyphens or stress markers to get syllables
+      const syllables=p.split(/[-|]/).filter(Boolean);
+      // Find index after STRESS marker
+      let stressIdx=-1;
+      const cleaned=[];
+      p.split('|').forEach((seg,i)=>{
+        if(seg==='STRESS'){ stressIdx=cleaned.length; }
+        else { seg.split('-').filter(Boolean).forEach(s=>cleaned.push({s,stressed:false})); }
+      });
+      // Simpler: just uppercase the stressed syllable
+      if(stressIdx>=0&&stressIdx<cleaned.length) cleaned[stressIdx].stressed=true;
+
+      // If we couldn't parse it well, just show the raw cleaned string
+      if(cleaned.length===0) return `<div style="font-family:'Courier Prime',monospace;font-size:14px;color:var(--gold);margin:4px 0 2px;letter-spacing:1px">${p}</div>`;
+
+      const rendered=cleaned.map(({s,stressed})=>
+        stressed
+          ? `<span style="color:var(--gold);font-weight:700;font-size:16px;text-decoration:underline;text-underline-offset:3px">${s.toUpperCase()}</span>`
+          : `<span style="color:var(--muted)">${s}</span>`
+      ).join('<span style="color:var(--border)">-</span>');
+
+      return `<div style="font-family:'Courier Prime',monospace;font-size:14px;margin:5px 0 4px;letter-spacing:.5px">${rendered}</div>`;
+    }
+
+    // Fetch pronunciation separately from Wordnik (the WOTD endpoint often omits it)
+    async function fetchWordnikPronunciation(word){
+      try {
+        const r=await fetch(`https://api.wordnik.com/v4/word.json/${encodeURIComponent(word)}/pronunciations?api_key=a2a73e7b947cad4cbf9e2nh2avb11d2m3u3b08yilxhk&limit=5`);
+        if(!r.ok) return '';
+        const arr=await r.json();
+        // Prefer "ahd" (American Heritage, readable) then "ipa", then first available
+        const pref=['ahd-legacy','ahd','gcide-defs','ipa'];
+        for(const type of pref){
+          const match=arr.find(p=>p.rawType&&p.rawType.toLowerCase().includes(type.split('-')[0]));
+          if(match&&match.raw) return {raw:match.raw, type:match.rawType||''};
+        }
+        if(arr.length&&arr[0].raw) return {raw:arr[0].raw, type:arr[0].rawType||''};
+      } catch(e){}
+      return null;
+    }
+
+    // ── Word of the Day — Wordnik free API ──
+    try {
+      const wRes=await fetch('https://api.wordnik.com/v4/words.json/wordOfTheDay?api_key=a2a73e7b947cad4cbf9e2nh2avb11d2m3u3b08yilxhk&v=1');
+      if(wRes.ok){
+        const w=await wRes.json();
+        const word=w.word||'';
+        const defs=w.definitions||[];
+        const ex=w.examples&&w.examples[0]?w.examples[0].text||'':'';
+        const note=w.note||'';
+        if(word){
+          // Fetch pronunciation in parallel
+          const pron=await fetchWordnikPronunciation(word);
+          const pronHTML=pron?buildPronouncerHTML(pron.raw):'';
+          // AHD format is already readable (e.g. "mĕl-ĭf′lo͞o-əs") — show it as-is too
+          const rawDisplay=pron&&pron.type&&pron.type.toLowerCase().includes('ahd')
+            ? `<div style="font-size:11px;color:var(--border);font-family:'Courier Prime',monospace;margin-bottom:2px">${pron.raw}</div>` : '';
+
+          html+=`<div class="fact-box" style="border-color:var(--gold)">
+            <div style="font-family:'Oswald',sans-serif;font-size:22px;font-weight:700;color:var(--gold);margin-bottom:2px">${word}</div>
+            ${rawDisplay}
+            ${pronHTML
+              ? `<div style="background:var(--dark);border-radius:6px;padding:7px 10px;margin-bottom:8px;border:1px solid var(--border)">
+                  <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px">🎙 Say it:</div>
+                  ${pronHTML}
+                </div>`
+              : ''}
+            ${defs.slice(0,2).map(d=>`
+              <div style="margin-bottom:6px">
+                <span style="font-size:11px;color:var(--red);text-transform:uppercase;letter-spacing:1px;font-weight:600">${d.partOfSpeech||''}</span>
+                <div style="font-size:14px;color:var(--text);margin-top:2px">${d.text||''}</div>
+              </div>`).join('')}
+            ${ex?`<div style="font-size:13px;color:var(--muted);font-style:italic;margin-top:6px;padding-top:6px;border-top:1px solid var(--border)">"${ex}"</div>`:''}
+            ${note?`<div style="font-size:12px;color:var(--muted);margin-top:6px">${note}</div>`:''}
+          </div>`;
+        }
+      }
+    } catch(e){}
+
+    // Fallback word if Wordnik failed — includes hand-written radio pronouncers
+    if(!html){
+      const fallbackWords=[
+        {word:'Mellifluous', pronouncer:'muh-LIF-loo-us', pos:'adjective', def:'Sweet or musical; pleasant to hear.',           ex:'"She had a mellifluous voice that captivated the entire room."'},
+        {word:'Ephemeral',   pronouncer:'ih-FEM-er-ul',   pos:'adjective', def:'Lasting for a very short time.',                ex:'"The ephemeral beauty of a sunset is what makes it special."'},
+        {word:'Serendipity', pronouncer:'sair-en-DIP-ih-tee', pos:'noun', def:'The occurrence of happy events by chance.',     ex:'"It was pure serendipity that we met that day."'},
+        {word:'Ebullient',   pronouncer:'ih-BULL-yent',   pos:'adjective', def:'Cheerful and full of energy.',                 ex:'"The ebullient crowd kept the energy going all night."'},
+        {word:'Sanguine',    pronouncer:'SANG-gwin',      pos:'adjective', def:'Optimistic, especially in a difficult situation.', ex:'"Despite the setbacks, she remained sanguine about the future."'},
+        {word:'Perspicacious',pronouncer:'pur-spih-KAY-shus', pos:'adjective', def:'Having a ready insight; shrewd.',          ex:'"A perspicacious listener will catch things others miss."'},
+        {word:'Verisimilitude',pronouncer:'vair-ih-sih-MIL-ih-tood', pos:'noun', def:'The appearance of being true or real.',  ex:'"The documentary gave the story a sense of verisimilitude."'},
+      ];
+      const w=fallbackWords[TODAY.getDate()%fallbackWords.length];
+      html+=`<div class="fact-box" style="border-color:var(--gold)">
+        <div style="font-family:'Oswald',sans-serif;font-size:22px;font-weight:700;color:var(--gold);margin-bottom:2px">${w.word}</div>
+        <div style="background:var(--dark);border-radius:6px;padding:7px 10px;margin-bottom:8px;border:1px solid var(--border)">
+          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px">🎙 Say it:</div>
+          <div style="font-family:'Courier Prime',monospace;font-size:15px;letter-spacing:.5px">${
+            w.pronouncer.split('-').map(syl=>
+              syl===syl.toUpperCase()&&syl.length>1
+                ? `<span style="color:var(--gold);font-weight:700;font-size:17px;text-decoration:underline;text-underline-offset:3px">${syl}</span>`
+                : `<span style="color:var(--muted)">${syl}</span>`
+            ).join('<span style="color:var(--border)">-</span>')
+          }</div>
+        </div>
+        <div style="margin-bottom:6px">
+          <span style="font-size:11px;color:var(--red);text-transform:uppercase;letter-spacing:1px;font-weight:600">${w.pos}</span>
+          <div style="font-size:14px;color:var(--text);margin-top:2px">${w.def}</div>
+        </div>
+        <div style="font-size:13px;color:var(--muted);font-style:italic;margin-top:6px;padding-top:6px;border-top:1px solid var(--border)">${w.ex}</div>
+      </div>`;
+    }
+
+    // ── Phrase / Idiom of the Day — Merriam-Webster Word of the Day RSS ──
+    try {
+      const xml=await fetchRSS('https://www.merriam-webster.com/wotd/feed/rss2');
+      const items=Array.from(xml.querySelectorAll('item'));
+      if(items.length>0){
+        const item=items[0];
+        const title=strip(item.querySelector('title')?.textContent||'');
+        const desc=strip(item.querySelector('description')?.textContent||'');
+        const link=(item.querySelector('link')?.textContent||item.querySelector('guid')?.textContent||'').trim();
+        const pubDate=fmt(item.querySelector('pubDate')?.textContent||'');
+        if(title){
+          // Extract just the first sentence of desc as the definition teaser
+          const teaser=desc.replace(/<[^>]+>/g,'').replace(/\s+/g,' ').trim().slice(0,200);
+          html+=`<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
+            <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">📖 Merriam-Webster · ${pubDate}</div>
+            <div style="font-family:'Oswald',sans-serif;font-size:18px;font-weight:600;color:var(--text);margin-bottom:4px">
+              ${link?`<a href="${link}" target="_blank" style="color:var(--text);text-decoration:none">${title}</a>`:title}
+            </div>
+            ${teaser?`<div style="font-size:13px;color:var(--muted);line-height:1.6">${teaser}${teaser.length>=200?'…':''}</div>`:''}
+          </div>`;
+        }
+      }
+    } catch(e){}
+
+    // ── On This Day: Fun/quirky "phrases" — pull one idiom from a static list keyed to day ──
+    const idioms=[
+      {phrase:'The early bird catches the worm',meaning:'Those who start early or act promptly get the best results.'},
+      {phrase:'Break the ice',meaning:'To do something that reduces tension or gets conversation going.'},
+      {phrase:'Hit the nail on the head',meaning:'To describe exactly what is causing a situation or problem.'},
+      {phrase:'Bite the bullet',meaning:'To endure a painful situation stoically.'},
+      {phrase:'Barking up the wrong tree',meaning:'Looking in the wrong place or pursuing a mistaken lead.'},
+      {phrase:'Spill the beans',meaning:'To reveal a secret or confidential information.'},
+      {phrase:'Under the weather',meaning:'Feeling ill or not one\'s usual self.'},
+      {phrase:'A penny for your thoughts',meaning:'Used to ask what someone is thinking about.'},
+      {phrase:'Hit the sack',meaning:'To go to bed.'},
+      {phrase:'Burning the midnight oil',meaning:'Working late into the night.'},
+      {phrase:'The ball is in your court',meaning:'It is up to you to take the next step or make a decision.'},
+      {phrase:'Rome wasn\'t built in a day',meaning:'Important things take time.'},
+    ];
+    const idiom=idioms[(TODAY.getDate()+TODAY.getMonth())%idioms.length];
+    html+=`<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
+      <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">💬 Phrase of the Day</div>
+      <div style="font-family:'Oswald',sans-serif;font-size:17px;font-weight:600;color:var(--gold);margin-bottom:4px">"${idiom.phrase}"</div>
+      <div style="font-size:13px;color:var(--muted);line-height:1.6">${idiom.meaning}</div>
+    </div>`;
+
+    html+='<div class="source-credit">Sources: Wordnik · Merriam-Webster</div>';
+    document.getElementById('body-wordofday').innerHTML=stampUpdated(html);
+  } catch(e){ setError('body-wordofday',e.message); }
 }
 
 /* ══════════════════════════════════════════
    REFRESH ALL
 ══════════════════════════════════════════ */
 function refreshAll(){
-  loadWeather();
-  loadHistory();
-  loadBirthdays();
-  loadEvents();
-  loadMusicNews();
-  loadNews();
-  loadTrending();
-  loadFacts();
-  loadSports();
-  loadDailyExtras();
-  loadNationalDay();
+  const btn=document.getElementById('refresh-all-btn');
+  btn.textContent='⟳ Refreshing…';
+  btn.classList.add('refreshing');
+  btn.disabled=true;
+  const all=[
+    loadWeather(), loadHistory(), loadBirthdays(), loadEvents(),
+    loadMusicNews(), loadNews(), loadTrending(), loadFacts(),
+    loadSports(), loadDailyExtras(), loadNationalDay(),
+    loadTraffic(), loadWordOfDay()
+  ];
+  Promise.allSettled(all).then(()=>{
+    btn.textContent='⟳ Refresh All';
+    btn.classList.remove('refreshing');
+    btn.disabled=false;
+  });
 }
 
 window.addEventListener('DOMContentLoaded', refreshAll);
