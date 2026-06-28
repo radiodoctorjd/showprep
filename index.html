@@ -1212,29 +1212,26 @@ async function loadDailyExtras(){
     const mmNextDraw=nextDrawDay([2,5]);   // Tue, Fri
 
     // Helper: scrape jackpot + next draw from vtlottery.com via allorigins proxy
-    async function fetchVTLotteryPage(path){
+    async function fetchVTLotteryPage(path, gameName){
       const url='https://vtlottery.com/games/'+path;
       const res=await fetch('https://api.allorigins.win/get?url='+encodeURIComponent(url));
       if(!res.ok) throw new Error('allorigins '+res.status);
       const j=await res.json();
-      const content=j.contents||'';
+      const raw=j.contents||'';
 
-      // The page has a carousel at the top showing ALL games, then the specific game section
-      // starting with "# Powerball" or "# Mega Millions". We must skip past the carousel.
-      // Find the h1 heading for the specific game and only parse content after it.
-      const h1markers=['# Powerball\n','# Mega Millions\n'];
-      let gameSection=content;
-      for(const marker of h1markers){
-        const idx=content.indexOf(marker);
-        if(idx>0){ gameSection=content.slice(idx); break; }
-      }
+      // allorigins returns raw HTML (not markdown).
+      // The page has a carousel at top listing all games — skip past it
+      // by anchoring to the <h1> tag for this specific game.
+      const h1Idx=raw.search(new RegExp('<h1[^>]*>\\s*'+gameName,'i'));
+      const section=h1Idx>=0?raw.slice(h1Idx):raw;
 
-      // Now find jackpot and next draw only within the game-specific section
-      const jackpotMatch=gameSection.match(/Estimated Jackpot\s*\n\s*(\$[\d,]+)/);
-      const jackpot=jackpotMatch?jackpotMatch[1].trim():'';
+      // Parse jackpot: "Estimated Jackpot" followed (anywhere nearby) by "$348,000,000"
+      const jm=section.match(/Estimated Jackpot[\s\S]{0,200}?(\$[\d,]+)/i);
+      const jackpot=jm?jm[1].trim():'';
 
-      const nextMatch=gameSection.match(/Next Drawing\s*\n\s*([A-Z][a-z]{2} \d{1,2}, \d{4})/);
-      const nextDate=nextMatch?nextMatch[1].trim():'';
+      // Parse next draw date: "Next Drawing" followed by a date like "Jun 27, 2026"
+      const nm=section.match(/Next Drawing[\s\S]{0,200}?([A-Z][a-z]{2,8}\.?\s+\d{1,2},?\s+\d{4})/i);
+      const nextDate=nm?nm[1].trim():'';
 
       return {jackpot, nextDate};
     }
@@ -1243,8 +1240,8 @@ async function loadDailyExtras(){
     const [nyPbRes, nyMmRes, vtPbRes, vtMmRes] = await Promise.allSettled([
       fetch('https://data.ny.gov/resource/d6yy-54nr.json?$limit=1&$order=draw_date+DESC').then(r=>r.json()),
       fetch('https://data.ny.gov/resource/5xaw-6ayf.json?$limit=1&$order=draw_date+DESC').then(r=>r.json()),
-      fetchVTLotteryPage('powerball'),
-      fetchVTLotteryPage('mega-millions'),
+      fetchVTLotteryPage('powerball','Powerball'),
+      fetchVTLotteryPage('mega-millions','Mega Millions'),
     ]);
 
     const pbJackpot=vtPbRes.status==='fulfilled'?vtPbRes.value.jackpot:'';
