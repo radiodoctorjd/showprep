@@ -823,15 +823,14 @@ async function loadNews(){
 async function loadTrending(){
   setLoading('body-trending');
   try {
-    // Google News RSS feeds — free, no key, no auth
-    // Entertainment topic hash is stable and well-documented
+    // All keyword search URLs — more reliable through proxies than topic/homepage feeds
     const sources=[
       {
-        url:'https://news.google.com/rss/headlines/section/topic/ENTERTAINMENT?hl=en-US&gl=US&ceid=US:en',
-        cat:'🎬 Entertainment', limit:6
+        url:'https://news.google.com/rss/search?q=celebrity+entertainment+when:2d&hl=en-US&gl=US&ceid=US:en',
+        cat:'🎬 Entertainment', limit:5
       },
       {
-        url:'https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en',
+        url:'https://news.google.com/rss/search?q=trending+news+today+US+when:1d&hl=en-US&gl=US&ceid=US:en',
         cat:'📰 Top Stories', limit:5
       },
       {
@@ -850,16 +849,9 @@ async function loadTrending(){
       const {xml,src}=r.value;
       Array.from(xml.querySelectorAll('item')).slice(0,src.limit).forEach(item=>{
         const title=strip(item.querySelector('title')?.textContent||'');
-        // Google News RSS: <link> contains the clickable CBMi... redirect URL.
-        // <guid> is an internal non-clickable ID — don't use it for Google News.
-        // rss2json proxy puts the URL in item._item.link directly.
         let link='';
-        if(item._item&&item._item.link) {
-          link=item._item.link.trim(); // rss2json format
-        } else {
-          // Raw XML: <link> is the redirect URL, not <guid>
-          link=(item.querySelector('link')?.textContent||'').trim();
-        }
+        if(item._item&&item._item.link) link=item._item.link.trim();
+        else link=(item.querySelector('link')?.textContent||'').trim();
         const pubDate=fmt(item.querySelector('pubDate')?.textContent||'');
         const publisher=item.querySelector('source')?.textContent?.trim()||'';
         if(title) allItems.push({title,link,pubDate,publisher,cat:src.cat});
@@ -868,7 +860,6 @@ async function loadTrending(){
 
     if(allItems.length===0) throw new Error('No trending items loaded');
 
-    // Dedupe across categories
     const seen=new Set();
     const deduped=allItems.filter(i=>{
       const key=i.title.slice(0,40).toLowerCase();
@@ -876,7 +867,6 @@ async function loadTrending(){
       seen.add(key); return true;
     });
 
-    // Group by category for cleaner layout
     const byCat={};
     deduped.forEach(i=>{
       if(!byCat[i.cat]) byCat[i.cat]=[];
@@ -886,13 +876,15 @@ async function loadTrending(){
     let html='';
     Object.entries(byCat).forEach(([cat,items])=>{
       html+=`<div style="margin-bottom:14px">
-        <div style="font-family:'Oswald',sans-serif;font-size:12px;color:var(--red);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid var(--border)">${cat}</div>`;
+        <div class="item-label" style="margin-bottom:6px">${cat}</div>`;
       items.forEach(item=>{
         html+=`<div style="padding:6px 0;border-bottom:1px solid var(--border)">
-          <div style="font-size:14px;color:var(--text);line-height:1.45;margin-bottom:2px">
-            ${item.link?`<a href="${item.link}" target="_blank" style="color:#E8C97A;text-decoration:none">${item.title}</a>`:item.title}
+          <div style="font-size:14px;line-height:1.45;margin-bottom:2px">
+            ${item.link
+              ?`<a href="${item.link}" target="_blank" style="color:var(--text);text-decoration:none;font-weight:600">${item.title}</a>`
+              :`<span style="color:var(--text);font-weight:600">${item.title}</span>`}
           </div>
-          <div style="font-family:'Courier Prime',monospace;font-size:10px;color:var(--border)">
+          <div style="font-family:'Courier Prime',monospace;font-size:10px;color:var(--dim)">
             ${item.publisher?item.publisher+' · ':''}${item.pubDate}
           </div>
         </div>`;
