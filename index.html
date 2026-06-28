@@ -1208,6 +1208,32 @@ async function loadDailyExtras(){
     // Mega Millions: Tue(2), Fri(5)
     const mmNextDraw=nextDrawDay([2,5]);
 
+    // ── Fetch live jackpot amounts via Claude AI (web search) ──
+    let pbJackpot='', mmJackpot='';
+    try {
+      const aiRes=await fetch('https://api.anthropic.com/v1/messages',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          model:'claude-sonnet-4-6',
+          max_tokens:200,
+          tools:[{type:'web_search_20250305',name:'web_search'}],
+          messages:[{role:'user',content:'What are the current estimated jackpots for Powerball and Mega Millions as of today? Reply ONLY with valid JSON in this exact format, no other text: {"powerball":"$XXX Million","megamillions":"$XXX Million"}'}]
+        })
+      });
+      if(aiRes.ok){
+        const aiData=await aiRes.json();
+        // Find the final text block (after tool use)
+        const textBlock=aiData.content&&[...aiData.content].reverse().find(b=>b.type==='text');
+        if(textBlock&&textBlock.text){
+          const clean=textBlock.text.replace(/```json|```/g,'').trim();
+          const j=JSON.parse(clean);
+          pbJackpot=j.powerball||'';
+          mmJackpot=j.megamillions||'';
+        }
+      }
+    } catch(e){ /* jackpot fetch failed — fall through to link-only display */ }
+
     const [nyPbRes, nyMmRes] = await Promise.allSettled([
       fetch('https://data.ny.gov/resource/d6yy-54nr.json?$limit=1&$order=draw_date+DESC'),
       fetch('https://data.ny.gov/resource/5xaw-6ayf.json?$limit=1&$order=draw_date+DESC'),
@@ -1238,7 +1264,9 @@ async function loadDailyExtras(){
             <div style="background:var(--mid);border-radius:6px;padding:6px 10px;flex:1;min-width:120px">
               <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Est. Jackpot</div>
               <div style="font-family:'Oswald',sans-serif;font-size:14px;color:#3CBA6E">
-                <a href="https://www.powerball.com" target="_blank" style="color:#3CBA6E;text-decoration:none">powerball.com →</a>
+                ${pbJackpot
+                  ? `<a href="https://www.powerball.com" target="_blank" style="color:#3CBA6E;text-decoration:none">${pbJackpot}</a>`
+                  : `<a href="https://www.powerball.com" target="_blank" style="color:#3CBA6E;text-decoration:none">powerball.com →</a>`}
               </div>
             </div>
           </div>
@@ -1270,7 +1298,9 @@ async function loadDailyExtras(){
             <div style="background:var(--mid);border-radius:6px;padding:6px 10px;flex:1;min-width:120px">
               <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Est. Jackpot</div>
               <div style="font-family:'Oswald',sans-serif;font-size:14px;color:#3CBA6E">
-                <a href="https://www.megamillions.com" target="_blank" style="color:#3CBA6E;text-decoration:none">megamillions.com →</a>
+                ${mmJackpot
+                  ? `<a href="https://www.megamillions.com" target="_blank" style="color:#3CBA6E;text-decoration:none">${mmJackpot}</a>`
+                  : `<a href="https://www.megamillions.com" target="_blank" style="color:#3CBA6E;text-decoration:none">megamillions.com →</a>`}
               </div>
             </div>
           </div>
