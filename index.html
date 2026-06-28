@@ -1378,47 +1378,69 @@ async function loadNationalDay(){
 }
 
 /* ══════════════════════════════════════════
-   VT ROAD & TRAFFIC — Resource links + @511VT RSS
+   VT ROAD & TRAFFIC — Scrapes newengland511.org/List/Alerts
+   That page is server-rendered and shows either live alerts or "no advisories"
 ══════════════════════════════════════════ */
 async function loadTraffic(){
   setLoading('body-traffic');
   try {
     let html='';
+    let gotData=false;
 
-    // Try @511VT Twitter/X RSS via Nitter (public RSS bridge, no auth needed)
-    // Falls back gracefully if unavailable
-    let gotFeed=false;
     try {
-      const xml=await fetchRSS('https://nitter.poast.org/511VT/rss');
-      const items=Array.from(xml.querySelectorAll('item')).slice(0,6);
-      if(items.length>0){
-        gotFeed=true;
-        html+=`<div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">📡 @511VT Recent Updates</div>`;
-        items.forEach(item=>{
-          const title=strip(item.querySelector('title')?.textContent||'');
-          const pub=fmt(item.querySelector('pubDate')?.textContent||'');
-          let link='';
-          if(item._item&&item._item.link) link=item._item.link.trim();
-          else link=(item.querySelector('link')?.textContent||'').trim();
-          if(!title) return;
-          const isAlert=/(closed|closure|crash|accident|blocked|delay|detour|warning)/i.test(title);
-          html+=`<div style="padding:6px 0;border-bottom:1px solid var(--border)">
-            <div style="font-size:13px;line-height:1.45;margin-bottom:2px;color:${isAlert?'#FCA5A5':'var(--text)'}">
-              ${link?`<a href="${link}" target="_blank" style="color:${isAlert?'#FCA5A5':'#E8C97A'};text-decoration:none">${title}</a>`:title}
-            </div>
-            <div style="font-family:'Courier Prime',monospace;font-size:10px;color:var(--border)">${pub}</div>
+      const res=await fetch('https://api.allorigins.win/get?url='+encodeURIComponent('https://newengland511.org/List/Alerts'));
+      if(res.ok){
+        const j=await res.json();
+        const raw=j.contents||'';
+
+        // Check for "no advisories" message
+        const noneMsg=raw.includes('no advisories at this time')||raw.includes('No advisories at this time');
+
+        if(noneMsg){
+          gotData=true;
+          html+=`<div style="background:var(--mid);border-left:4px solid var(--green);border-radius:0 8px 8px 0;padding:12px 16px;font-size:14px;color:var(--text)">
+            ✅ <strong>No active advisories</strong> — NE 511 reports roads are clear in Vermont.
           </div>`;
-        });
+        } else {
+          // Try to extract alert text — alerts appear under "# Advisories" heading
+          // Look for list items between the Advisories heading and the login modal
+          const advisoryStart=raw.indexOf('Advisories');
+          const loginIdx=raw.indexOf('Log In',advisoryStart>0?advisoryStart:0);
+          const section=advisoryStart>0?raw.slice(advisoryStart,loginIdx>0?loginIdx:advisoryStart+8000):'';
+
+          // Extract text content — strip HTML tags
+          const textOnly=section.replace(/<script[\s\S]*?<\/script>/gi,'')
+            .replace(/<style[\s\S]*?<\/style>/gi,'')
+            .replace(/<[^>]+>/g,' ')
+            .replace(/\s{2,}/g,' ')
+            .trim();
+
+          // Pull out lines that look like alerts (contain route/road keywords)
+          const lines=textOnly.split(/[.\n]/).map(l=>l.trim()).filter(l=>
+            l.length>20 &&
+            /(VT-|US-|Route|I-\d|closed|closure|accident|crash|construction|delay|detour|restriction)/i.test(l)
+          );
+
+          if(lines.length>0){
+            gotData=true;
+            html+=`<div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">⚠ Active VT Advisories</div>`;
+            lines.slice(0,8).forEach(line=>{
+              const isSerious=/(closed|closure|crash|accident)/i.test(line);
+              html+=`<div style="padding:7px 0;border-bottom:1px solid var(--border);font-size:13px;line-height:1.5;color:${isSerious?'#FCA5A5':'var(--text)'}">
+                ${isSerious?'🚧':'⚠'} ${line}
+              </div>`;
+            });
+          }
+        }
       }
     } catch(e){}
 
-    if(!gotFeed){
-      html+=`<div style="background:var(--mid);border-left:4px solid var(--gold);border-radius:0 8px 8px 0;padding:10px 14px;margin-bottom:12px;font-size:13px;color:var(--muted);line-height:1.6">
-        Live incident feed unavailable. Use the links below or call <strong style="color:var(--text)">511</strong> for current road conditions.
+    if(!gotData){
+      html+=`<div style="background:var(--mid);border-left:4px solid var(--muted);border-radius:0 8px 8px 0;padding:12px 16px;font-size:13px;color:var(--muted);line-height:1.6">
+        Could not load NE 511 alert feed. Use the links below or call <strong style="color:var(--text)">511</strong>.
       </div>`;
     }
 
-    // Verified working resource links
     html+=`<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
       <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Live Resources</div>
       <div style="display:flex;flex-wrap:wrap;gap:8px">
@@ -1436,7 +1458,7 @@ async function loadTraffic(){
       </div>
     </div>`;
 
-    html+='<div class="source-credit">Sources: @511VT · newengland511.org · VTrans</div>';
+    html+='<div class="source-credit">Source: newengland511.org · VTrans</div>';
     document.getElementById('body-traffic').innerHTML=stampUpdated(html);
   } catch(e){ setError('body-traffic',e.message); }
 }
