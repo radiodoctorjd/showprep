@@ -1192,86 +1192,118 @@ async function loadDailyExtras(){
       }
     } catch(e){}
 
-    // ── Lottery — Google News RSS for winning numbers + jackpots ──
-    // Uses the same fetchRSS proxy chain that works for all other cards
+    // ── Lottery — NY Open Data for winning numbers (via allorigins proxy) ──
     html+=`<div class="item"><div class="item-label">🎟 Lottery — Winning Numbers &amp; Jackpots</div>`;
 
-    // Next draw day helpers
+    // Next draw helper — shows TONIGHT if drawing is today and it's before 11pm ET
     function nextDrawDay(drawDays){
       const now=new Date();
-      const today=now.getDay();
+      // Convert to ET
+      const etNow=new Date(now.toLocaleString('en-US',{timeZone:'America/New_York'}));
+      const todayET=etNow.getDay();
+      const hourET=etNow.getHours();
+      // Drawings are ~10:59pm ET — if it's a draw day and before 11pm, show TONIGHT
+      const drawTonight=drawDays.includes(todayET) && hourET < 23;
+      if(drawTonight){
+        return `<span style="color:var(--on-air);font-weight:700">TONIGHT</span>`;
+      }
+      // Otherwise find next draw day
       let minDiff=8;
-      drawDays.forEach(d=>{ let diff=(d-today+7)%7; if(diff===0) diff=7; if(diff<minDiff) minDiff=diff; });
-      const next=new Date(now); next.setDate(now.getDate()+minDiff);
+      drawDays.forEach(d=>{
+        let diff=(d-todayET+7)%7;
+        if(diff===0) diff=7;
+        if(diff<minDiff) minDiff=diff;
+      });
+      const next=new Date(etNow); next.setDate(etNow.getDate()+minDiff);
       return next.toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'});
     }
     const pbNextDraw=nextDrawDay([1,3,6]); // Mon, Wed, Sat
     const mmNextDraw=nextDrawDay([2,5]);   // Tue, Fri
 
-    // Fetch Powerball and Mega Millions news via Google News RSS
-    const [pbRss, mmRss] = await Promise.allSettled([
-      fetchRSS('https://news.google.com/rss/search?q=Powerball+winning+numbers+jackpot&hl=en-US&gl=US&ceid=US:en'),
-      fetchRSS('https://news.google.com/rss/search?q=Mega+Millions+winning+numbers+jackpot&hl=en-US&gl=US&ceid=US:en'),
-    ]);
-
-    // Helper: extract dollar amount from headline text e.g. "$327 million" or "$1.2 billion"
-    function extractJackpot(text){
-      const m=text.match(/\$[\d,.]+\s*(million|billion)/i);
-      if(!m) return '';
-      return m[0].replace(/\s+/g,' ').replace(/(\d),(\d)/g,'$1,$2');
+    // Fetch from NY Open Data via allorigins proxy (works in browser)
+    function ballHTML(whites, special, specialColor){
+      const bs=`display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;background:var(--mid);border:2px solid var(--border);font-family:'Oswald',sans-serif;font-size:13px;font-weight:700;margin:2px;color:#fff`;
+      const ss=`display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;background:${specialColor};border:2px solid transparent;font-family:'Oswald',sans-serif;font-size:13px;font-weight:700;margin:2px 2px 2px 6px;color:#fff`;
+      return whites.map(n=>`<span style="${bs}">${String(n).padStart(2,'0')}</span>`).join('')
+        +(special?`<span style="${ss}">${String(special).padStart(2,'0')}</span>`:'');
     }
 
-    function renderLotteryGame(rssResult, color, label, ballColor, nextDraw, officialUrl){
-      let jackpot='', headline='', headlineUrl='', dateStr='';
-      if(rssResult.status==='fulfilled'){
-        const items=Array.from(rssResult.value.querySelectorAll('item'));
-        for(const item of items.slice(0,5)){
-          const title=strip(item.querySelector('title')?.textContent||'');
-          let link='';
-          if(item._item&&item._item.link) link=item._item.link.trim();
-          else link=(item.querySelector('link')?.textContent||'').trim();
-          const pub=fmt(item.querySelector('pubDate')?.textContent||'');
-          const j=extractJackpot(title);
-          if(j&&!jackpot){ jackpot=j; }
-          if(!headline&&title){ headline=title; headlineUrl=link; dateStr=pub; }
-        }
-      }
+    const [nyPbRes, nyMmRes] = await Promise.allSettled([
+      fetch('https://api.allorigins.win/get?url='+encodeURIComponent('https://data.ny.gov/resource/d6yy-54nr.json?$limit=1&$order=draw_date+DESC')).then(r=>r.json()).then(d=>JSON.parse(d.contents)),
+      fetch('https://api.allorigins.win/get?url='+encodeURIComponent('https://data.ny.gov/resource/5xaw-6ayf.json?$limit=1&$order=draw_date+DESC')).then(r=>r.json()).then(d=>JSON.parse(d.contents)),
+    ]);
 
-      return `<div style="margin-top:10px">
-        <div style="font-size:12px;font-weight:600;color:#fff;margin-bottom:6px">${label}</div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px">
+    // Powerball
+    if(nyPbRes.status==='fulfilled'&&nyPbRes.value.length>0){
+      const row=nyPbRes.value[0];
+      const parts=(row.winning_numbers||'').trim().split(/\s+/);
+      const whites=parts.slice(0,5); const pb=parts[5]||'';
+      const pp=row.multiplier||'';
+      const dStr=row.draw_date?new Date(row.draw_date).toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric',year:'numeric'}):'';
+      html+=`<div style="margin-top:10px">
+        <div style="font-size:12px;font-weight:600;color:#fff;margin-bottom:2px">🔴 Powerball</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:5px">Last draw: ${dStr}${pp?' · Power Play: '+pp+'x':''}</div>
+        <div>${ballHTML(whites,pb,'#C8102E')}</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:4px">White balls &nbsp;·&nbsp; <span style="color:#C8102E;font-weight:700">●</span> Powerball</div>
+        <div style="margin-top:8px;display:flex;gap:10px;flex-wrap:wrap">
           <div style="background:var(--mid);border-radius:6px;padding:6px 10px;flex:1;min-width:110px">
             <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Next Drawing</div>
-            <div style="font-family:'Oswald',sans-serif;font-size:13px;color:var(--gold)">${nextDraw}</div>
+            <div style="font-family:'Oswald',sans-serif;font-size:13px;color:var(--gold)">${pbNextDraw}</div>
           </div>
           <div style="background:var(--mid);border-radius:6px;padding:6px 10px;flex:1;min-width:110px">
             <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Est. Jackpot</div>
-            <div style="font-family:'Oswald',sans-serif;font-size:15px;font-weight:700;color:#3CBA6E">
-              ${jackpot
-                ? `<a href="${officialUrl}" target="_blank" style="color:#3CBA6E;text-decoration:none">${jackpot}</a>`
-                : `<a href="${officialUrl}" target="_blank" style="color:var(--muted);font-size:12px;text-decoration:none">${officialUrl.replace('https://www.','').replace('https://','')} →</a>`}
+            <div style="font-family:'Oswald',sans-serif;font-size:14px;color:#3CBA6E">
+              <a href="https://www.powerball.com" target="_blank" style="color:#3CBA6E;text-decoration:none">powerball.com →</a>
             </div>
           </div>
         </div>
-        ${headline ? `<div style="font-size:12px;color:var(--muted);line-height:1.5">
-          ${headlineUrl?`<a href="${headlineUrl}" target="_blank" style="color:#E8C97A;text-decoration:none">${headline}</a>`:headline}
-          ${dateStr?`<span style="color:var(--border)"> · ${dateStr}</span>`:''}
-        </div>` : ''}
       </div>`;
+    } else {
+      html+=`<div style="margin-top:10px"><div style="font-size:12px;font-weight:600;color:#fff;margin-bottom:4px">🔴 Powerball</div>
+        <div style="font-size:13px;color:var(--muted)">Next Drawing: ${pbNextDraw} &nbsp;·&nbsp;
+        <a href="https://www.powerball.com" target="_blank" style="color:#3CBA6E">powerball.com →</a></div></div>`;
     }
 
-    html+=renderLotteryGame(pbRss,'#C8102E','🔴 Powerball','#C8102E',pbNextDraw,'https://www.powerball.com');
-    html+=`<div style="border-top:1px solid var(--border);margin:10px 0"></div>`;
-    html+=renderLotteryGame(mmRss,'#003DA5','🔵 Mega Millions','#003DA5',mmNextDraw,'https://www.megamillions.com');
+    // Mega Millions
+    if(nyMmRes.status==='fulfilled'&&nyMmRes.value.length>0){
+      const row=nyMmRes.value[0];
+      const whites=(row.winning_numbers||'').trim().split(/\s+/).filter(Boolean);
+      const mb=(row.mega_ball||'').trim();
+      const mp=row.multiplier||'';
+      const dStr=row.draw_date?new Date(row.draw_date).toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric',year:'numeric'}):'';
+      html+=`<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
+        <div style="font-size:12px;font-weight:600;color:#fff;margin-bottom:2px">🔵 Mega Millions</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:5px">Last draw: ${dStr}${mp?' · Megaplier: '+mp+'x':''}</div>
+        <div>${ballHTML(whites,mb,'#003DA5')}</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:4px">White balls &nbsp;·&nbsp; <span style="color:#003DA5;font-weight:700">●</span> Mega Ball</div>
+        <div style="margin-top:8px;display:flex;gap:10px;flex-wrap:wrap">
+          <div style="background:var(--mid);border-radius:6px;padding:6px 10px;flex:1;min-width:110px">
+            <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Next Drawing</div>
+            <div style="font-family:'Oswald',sans-serif;font-size:13px;color:var(--gold)">${mmNextDraw}</div>
+          </div>
+          <div style="background:var(--mid);border-radius:6px;padding:6px 10px;flex:1;min-width:110px">
+            <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Est. Jackpot</div>
+            <div style="font-family:'Oswald',sans-serif;font-size:14px;color:#3CBA6E">
+              <a href="https://www.megamillions.com" target="_blank" style="color:#3CBA6E;text-decoration:none">megamillions.com →</a>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    } else {
+      html+=`<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
+        <div style="font-size:12px;font-weight:600;color:#fff;margin-bottom:4px">🔵 Mega Millions</div>
+        <div style="font-size:13px;color:var(--muted)">Next Drawing: ${mmNextDraw} &nbsp;·&nbsp;
+        <a href="https://www.megamillions.com" target="_blank" style="color:#3CBA6E">megamillions.com →</a></div></div>`;
+    }
 
-    html+=`<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+    html+=`<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap">
       <a href="https://www.powerball.com" target="_blank" style="background:var(--mid);border:1px solid var(--border);border-radius:6px;padding:5px 10px;text-decoration:none;font-size:12px;color:var(--text)">🔴 Powerball →</a>
       <a href="https://www.megamillions.com" target="_blank" style="background:var(--mid);border:1px solid var(--border);border-radius:6px;padding:5px 10px;text-decoration:none;font-size:12px;color:var(--text)">🔵 Mega Millions →</a>
       <a href="https://vtlottery.com/games/megabucks" target="_blank" style="background:var(--mid);border:1px solid var(--border);border-radius:6px;padding:5px 10px;text-decoration:none;font-size:12px;color:var(--text)">🟢 VT Megabucks →</a>
     </div>`;
 
-    html+=`</div>`; // close lottery item
-    html+='<div class="source-credit">Sources: sunrise-sunset.org · Google News (Powerball · Mega Millions)</div>';
+    html+=`</div>`;
+    html+='<div class="source-credit">Sources: sunrise-sunset.org · NY Open Data (data.ny.gov)</div>';
     document.getElementById('body-extras').innerHTML=stampUpdated(html);
   } catch(e){ setError('body-extras',e.message); }
 }
@@ -1327,47 +1359,47 @@ async function loadNationalDay(){
 }
 
 /* ══════════════════════════════════════════
-   VT ROAD & TRAFFIC
-   Google News RSS for VT road incidents + working newengland511 links
+   VT ROAD & TRAFFIC — Resource links + @511VT RSS
 ══════════════════════════════════════════ */
 async function loadTraffic(){
   setLoading('body-traffic');
   try {
     let html='';
-    let gotItems=false;
 
-    // Google News RSS search for VT road conditions — works through existing fetchRSS proxies
+    // Try @511VT Twitter/X RSS via Nitter (public RSS bridge, no auth needed)
+    // Falls back gracefully if unavailable
+    let gotFeed=false;
     try {
-      const xml=await fetchRSS('https://news.google.com/rss/search?q=Vermont+road+closure+OR+accident+OR+traffic+Route+7+OR+Route+2+OR+Addison&hl=en-US&gl=US&ceid=US:en');
+      const xml=await fetchRSS('https://nitter.poast.org/511VT/rss');
       const items=Array.from(xml.querySelectorAll('item')).slice(0,6);
       if(items.length>0){
-        gotItems=true;
+        gotFeed=true;
+        html+=`<div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">📡 @511VT Recent Updates</div>`;
         items.forEach(item=>{
           const title=strip(item.querySelector('title')?.textContent||'');
-          // Use <link> for Google News (clickable redirect), not <guid>
+          const pub=fmt(item.querySelector('pubDate')?.textContent||'');
           let link='';
           if(item._item&&item._item.link) link=item._item.link.trim();
           else link=(item.querySelector('link')?.textContent||'').trim();
-          const pub=fmt(item.querySelector('pubDate')?.textContent||'');
-          const publisher=item.querySelector('source')?.textContent?.trim()||'';
           if(!title) return;
-          html+=`<div style="padding:7px 0;border-bottom:1px solid var(--border)">
-            <div style="font-size:14px;line-height:1.45;margin-bottom:2px">
-              ${link?`<a href="${link}" target="_blank" style="color:#E8C97A;text-decoration:none">${title}</a>`:title}
+          const isAlert=/(closed|closure|crash|accident|blocked|delay|detour|warning)/i.test(title);
+          html+=`<div style="padding:6px 0;border-bottom:1px solid var(--border)">
+            <div style="font-size:13px;line-height:1.45;margin-bottom:2px;color:${isAlert?'#FCA5A5':'var(--text)'}">
+              ${link?`<a href="${link}" target="_blank" style="color:${isAlert?'#FCA5A5':'#E8C97A'};text-decoration:none">${title}</a>`:title}
             </div>
-            <div style="font-family:'Courier Prime',monospace;font-size:10px;color:var(--border)">
-              ${publisher?publisher+' · ':''}${pub}
-            </div>
+            <div style="font-family:'Courier Prime',monospace;font-size:10px;color:var(--border)">${pub}</div>
           </div>`;
         });
       }
     } catch(e){}
 
-    if(!gotItems){
-      html+=`<div style="color:var(--green);font-size:14px;padding:8px 0">✅ No road incidents currently in the news for Addison County / Route 7</div>`;
+    if(!gotFeed){
+      html+=`<div style="background:var(--mid);border-left:4px solid var(--gold);border-radius:0 8px 8px 0;padding:10px 14px;margin-bottom:12px;font-size:13px;color:var(--muted);line-height:1.6">
+        Live incident feed unavailable. Use the links below or call <strong style="color:var(--text)">511</strong> for current road conditions.
+      </div>`;
     }
 
-    // Verified working links
+    // Verified working resource links
     html+=`<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
       <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Live Resources</div>
       <div style="display:flex;flex-wrap:wrap;gap:8px">
@@ -1377,16 +1409,15 @@ async function loadTraffic(){
            style="background:var(--mid);border:1px solid var(--border);border-radius:6px;padding:7px 12px;text-decoration:none;font-size:13px;color:var(--text)">🚧 Current Alerts</a>
         <a href="https://vtransparency.vermont.gov/pages/Current%20Conditions" target="_blank"
            style="background:var(--mid);border:1px solid var(--border);border-radius:6px;padding:7px 12px;text-decoration:none;font-size:13px;color:var(--text)">🏔 VTrans Conditions</a>
-        <a href="https://newengland511.org/region/messages" target="_blank"
-           style="background:var(--mid);border:1px solid var(--border);border-radius:6px;padding:7px 12px;text-decoration:none;font-size:13px;color:var(--text)">📋 Road Messages</a>
+        <a href="https://x.com/511VT" target="_blank"
+           style="background:var(--mid);border:1px solid var(--border);border-radius:6px;padding:7px 12px;text-decoration:none;font-size:13px;color:var(--text)">𝕏 @511VT</a>
       </div>
       <div style="margin-top:10px;font-size:12px;color:var(--muted)">
-        📞 Call <strong style="color:var(--text)">511</strong> from any VT phone ·
-        Follow <a href="https://x.com/511VT" target="_blank" style="color:var(--gold)">@511VT</a> for live updates
+        📞 Call <strong style="color:var(--text)">511</strong> from any VT phone for live road conditions
       </div>
     </div>`;
 
-    html+='<div class="source-credit">Sources: Google News · newengland511.org · VTrans</div>';
+    html+='<div class="source-credit">Sources: @511VT · newengland511.org · VTrans</div>';
     document.getElementById('body-traffic').innerHTML=stampUpdated(html);
   } catch(e){ setError('body-traffic',e.message); }
 }
