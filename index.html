@@ -1139,7 +1139,7 @@ async function loadDailyExtras(){
       let minDiff=8;
       drawDays.forEach(d=>{ let diff=(d-todayET+7)%7; if(diff===0) diff=7; if(diff<minDiff) minDiff=diff; });
       const next=new Date(etNow); next.setDate(etNow.getDate()+minDiff);
-      return next.toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'});
+      return next.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
     }
     const pbNextDraw=nextDrawDay([1,3,6]); // Mon, Wed, Sat
     const mmNextDraw=nextDrawDay([2,5]);   // Tue, Fri
@@ -1178,9 +1178,13 @@ async function loadDailyExtras(){
     ]);
 
     const pbJackpot=vtPbRes.status==='fulfilled'?vtPbRes.value.jackpot:'';
-    const pbVTNext=vtPbRes.status==='fulfilled'?vtPbRes.value.nextDate:'';
+    const pbVTNext=vtPbRes.status==='fulfilled'&&vtPbRes.value.nextDate
+      ? new Date(vtPbRes.value.nextDate).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'})
+      : '';
     const mmJackpot=vtMmRes.status==='fulfilled'?vtMmRes.value.jackpot:'';
-    const mmVTNext=vtMmRes.status==='fulfilled'?vtMmRes.value.nextDate:'';
+    const mmVTNext=vtMmRes.status==='fulfilled'&&vtMmRes.value.nextDate
+      ? new Date(vtMmRes.value.nextDate).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'})
+      : '';
 
     // Use VT Lottery's next date if available (most current), else fall back to calculated
     const pbNextDisplay=pbVTNext||pbNextDraw;
