@@ -1192,46 +1192,60 @@ async function loadDailyExtras(){
       }
     } catch(e){}
 
-    // ── Lottery — NY Open Data for winning numbers (via allorigins proxy) ──
-    html+=`<div class="item"><div class="item-label">🎟 Lottery — Winning Numbers &amp; Jackpots</div>`;
+    // ── Lottery — NY Open Data for numbers + VT Lottery site for jackpots ──
+    html+=`<div class="item"><div class="item-label">🎟 Lottery — Most Recent Winning Numbers</div>`;
 
-    // Next draw helper — shows TONIGHT if drawing is today and it's before 11pm ET
+    // Next draw helper — shows TONIGHT if drawing is today and before 11pm ET
     function nextDrawDay(drawDays){
-      const now=new Date();
-      // Convert to ET
-      const etNow=new Date(now.toLocaleString('en-US',{timeZone:'America/New_York'}));
+      const etNow=new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));
       const todayET=etNow.getDay();
       const hourET=etNow.getHours();
-      // Drawings are ~10:59pm ET — if it's a draw day and before 11pm, show TONIGHT
-      const drawTonight=drawDays.includes(todayET) && hourET < 23;
-      if(drawTonight){
-        return `<span style="color:var(--on-air);font-weight:700">TONIGHT</span>`;
+      if(drawDays.includes(todayET)&&hourET<23){
+        return `<span style="color:var(--on-air);font-weight:700;font-size:15px">🔴 TONIGHT</span>`;
       }
-      // Otherwise find next draw day
       let minDiff=8;
-      drawDays.forEach(d=>{
-        let diff=(d-todayET+7)%7;
-        if(diff===0) diff=7;
-        if(diff<minDiff) minDiff=diff;
-      });
+      drawDays.forEach(d=>{ let diff=(d-todayET+7)%7; if(diff===0) diff=7; if(diff<minDiff) minDiff=diff; });
       const next=new Date(etNow); next.setDate(etNow.getDate()+minDiff);
       return next.toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'});
     }
     const pbNextDraw=nextDrawDay([1,3,6]); // Mon, Wed, Sat
     const mmNextDraw=nextDrawDay([2,5]);   // Tue, Fri
 
-    // Fetch from NY Open Data via allorigins proxy (works in browser)
-    function ballHTML(whites, special, specialColor){
-      const bs=`display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;background:var(--mid);border:2px solid var(--border);font-family:'Oswald',sans-serif;font-size:13px;font-weight:700;margin:2px;color:#fff`;
-      const ss=`display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;background:${specialColor};border:2px solid transparent;font-family:'Oswald',sans-serif;font-size:13px;font-weight:700;margin:2px 2px 2px 6px;color:#fff`;
-      return whites.map(n=>`<span style="${bs}">${String(n).padStart(2,'0')}</span>`).join('')
-        +(special?`<span style="${ss}">${String(special).padStart(2,'0')}</span>`:'');
+    // Helper: scrape jackpot + next draw from vtlottery.com via allorigins proxy
+    async function fetchVTLotteryPage(path){
+      const url='https://vtlottery.com/games/'+path;
+      const res=await fetch('https://api.allorigins.win/get?url='+encodeURIComponent(url));
+      if(!res.ok) throw new Error('allorigins '+res.status);
+      const j=await res.json();
+      const html=j.contents||'';
+
+      // Jackpot: "Estimated Jackpot\n$348,000,000"
+      const jackpotMatch=html.match(/Estimated Jackpot[^$]*(\$[\d,]+(?:,\d+)*)/);
+      const jackpot=jackpotMatch?jackpotMatch[1].trim():'';
+
+      // Next Drawing date: "Jun 27, 2026" or "Jun 30, 2026"
+      const nextMatch=html.match(/Next Drawing\s*\n?\s*([A-Z][a-z]{2} \d{1,2}, \d{4})/);
+      const nextDate=nextMatch?nextMatch[1].trim():'';
+
+      return {jackpot, nextDate};
     }
 
-    const [nyPbRes, nyMmRes] = await Promise.allSettled([
-      fetch('https://api.allorigins.win/get?url='+encodeURIComponent('https://data.ny.gov/resource/d6yy-54nr.json?$limit=1&$order=draw_date+DESC')).then(r=>r.json()).then(d=>JSON.parse(d.contents)),
-      fetch('https://api.allorigins.win/get?url='+encodeURIComponent('https://data.ny.gov/resource/5xaw-6ayf.json?$limit=1&$order=draw_date+DESC')).then(r=>r.json()).then(d=>JSON.parse(d.contents)),
+    // Fetch numbers from NY Open Data (open CORS, no proxy) + jackpots from VT Lottery
+    const [nyPbRes, nyMmRes, vtPbRes, vtMmRes] = await Promise.allSettled([
+      fetch('https://data.ny.gov/resource/d6yy-54nr.json?$limit=1&$order=draw_date+DESC').then(r=>r.json()),
+      fetch('https://data.ny.gov/resource/5xaw-6ayf.json?$limit=1&$order=draw_date+DESC').then(r=>r.json()),
+      fetchVTLotteryPage('powerball'),
+      fetchVTLotteryPage('mega-millions'),
     ]);
+
+    const pbJackpot=vtPbRes.status==='fulfilled'?vtPbRes.value.jackpot:'';
+    const pbVTNext=vtPbRes.status==='fulfilled'?vtPbRes.value.nextDate:'';
+    const mmJackpot=vtMmRes.status==='fulfilled'?vtMmRes.value.jackpot:'';
+    const mmVTNext=vtMmRes.status==='fulfilled'?vtMmRes.value.nextDate:'';
+
+    // Use VT Lottery's next date if available (most current), else fall back to calculated
+    const pbNextDisplay=pbVTNext||pbNextDraw;
+    const mmNextDisplay=mmVTNext||mmNextDraw;
 
     // Powerball
     if(nyPbRes.status==='fulfilled'&&nyPbRes.value.length>0){
@@ -1248,20 +1262,20 @@ async function loadDailyExtras(){
         <div style="margin-top:8px;display:flex;gap:10px;flex-wrap:wrap">
           <div style="background:var(--mid);border-radius:6px;padding:6px 10px;flex:1;min-width:110px">
             <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Next Drawing</div>
-            <div style="font-family:'Oswald',sans-serif;font-size:13px;color:var(--gold)">${pbNextDraw}</div>
+            <div style="font-family:'Oswald',sans-serif;font-size:13px;color:var(--gold)">${pbNextDisplay}</div>
           </div>
           <div style="background:var(--mid);border-radius:6px;padding:6px 10px;flex:1;min-width:110px">
             <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Est. Jackpot</div>
-            <div style="font-family:'Oswald',sans-serif;font-size:14px;color:#3CBA6E">
-              <a href="https://www.powerball.com" target="_blank" style="color:#3CBA6E;text-decoration:none">powerball.com →</a>
+            <div style="font-family:'Oswald',sans-serif;font-size:16px;font-weight:700;color:#3CBA6E">
+              ${pbJackpot
+                ?`<a href="https://vtlottery.com/games/powerball" target="_blank" style="color:#3CBA6E;text-decoration:none">${pbJackpot}</a>`
+                :`<a href="https://vtlottery.com/games/powerball" target="_blank" style="color:var(--muted);font-size:12px;text-decoration:none">vtlottery.com →</a>`}
             </div>
           </div>
         </div>
       </div>`;
     } else {
-      html+=`<div style="margin-top:10px"><div style="font-size:12px;font-weight:600;color:#fff;margin-bottom:4px">🔴 Powerball</div>
-        <div style="font-size:13px;color:var(--muted)">Next Drawing: ${pbNextDraw} &nbsp;·&nbsp;
-        <a href="https://www.powerball.com" target="_blank" style="color:#3CBA6E">powerball.com →</a></div></div>`;
+      html+=`<div style="color:var(--muted);font-size:13px;padding:8px 0">🔴 Powerball · Next: ${pbNextDisplay}${pbJackpot?' · Est. Jackpot: <strong style="color:#3CBA6E">'+pbJackpot+'</strong>':''} · <a href="https://vtlottery.com/games/powerball" target="_blank" style="color:#3CBA6E">vtlottery.com →</a></div>`;
     }
 
     // Mega Millions
@@ -1279,31 +1293,30 @@ async function loadDailyExtras(){
         <div style="margin-top:8px;display:flex;gap:10px;flex-wrap:wrap">
           <div style="background:var(--mid);border-radius:6px;padding:6px 10px;flex:1;min-width:110px">
             <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Next Drawing</div>
-            <div style="font-family:'Oswald',sans-serif;font-size:13px;color:var(--gold)">${mmNextDraw}</div>
+            <div style="font-family:'Oswald',sans-serif;font-size:13px;color:var(--gold)">${mmNextDisplay}</div>
           </div>
           <div style="background:var(--mid);border-radius:6px;padding:6px 10px;flex:1;min-width:110px">
             <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Est. Jackpot</div>
-            <div style="font-family:'Oswald',sans-serif;font-size:14px;color:#3CBA6E">
-              <a href="https://www.megamillions.com" target="_blank" style="color:#3CBA6E;text-decoration:none">megamillions.com →</a>
+            <div style="font-family:'Oswald',sans-serif;font-size:16px;font-weight:700;color:#3CBA6E">
+              ${mmJackpot
+                ?`<a href="https://vtlottery.com/games/mega-millions" target="_blank" style="color:#3CBA6E;text-decoration:none">${mmJackpot}</a>`
+                :`<a href="https://vtlottery.com/games/mega-millions" target="_blank" style="color:var(--muted);font-size:12px;text-decoration:none">vtlottery.com →</a>`}
             </div>
           </div>
         </div>
       </div>`;
     } else {
-      html+=`<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
-        <div style="font-size:12px;font-weight:600;color:#fff;margin-bottom:4px">🔵 Mega Millions</div>
-        <div style="font-size:13px;color:var(--muted)">Next Drawing: ${mmNextDraw} &nbsp;·&nbsp;
-        <a href="https://www.megamillions.com" target="_blank" style="color:#3CBA6E">megamillions.com →</a></div></div>`;
+      html+=`<div style="color:var(--muted);font-size:13px;padding:8px 0">🔵 Mega Millions · Next: ${mmNextDisplay}${mmJackpot?' · Est. Jackpot: <strong style="color:#3CBA6E">'+mmJackpot+'</strong>':''} · <a href="https://vtlottery.com/games/mega-millions" target="_blank" style="color:#3CBA6E">vtlottery.com →</a></div>`;
     }
 
     html+=`<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap">
-      <a href="https://www.powerball.com" target="_blank" style="background:var(--mid);border:1px solid var(--border);border-radius:6px;padding:5px 10px;text-decoration:none;font-size:12px;color:var(--text)">🔴 Powerball →</a>
-      <a href="https://www.megamillions.com" target="_blank" style="background:var(--mid);border:1px solid var(--border);border-radius:6px;padding:5px 10px;text-decoration:none;font-size:12px;color:var(--text)">🔵 Mega Millions →</a>
+      <a href="https://vtlottery.com/games/powerball" target="_blank" style="background:var(--mid);border:1px solid var(--border);border-radius:6px;padding:5px 10px;text-decoration:none;font-size:12px;color:var(--text)">🔴 Powerball →</a>
+      <a href="https://vtlottery.com/games/mega-millions" target="_blank" style="background:var(--mid);border:1px solid var(--border);border-radius:6px;padding:5px 10px;text-decoration:none;font-size:12px;color:var(--text)">🔵 Mega Millions →</a>
       <a href="https://vtlottery.com/games/megabucks" target="_blank" style="background:var(--mid);border:1px solid var(--border);border-radius:6px;padding:5px 10px;text-decoration:none;font-size:12px;color:var(--text)">🟢 VT Megabucks →</a>
     </div>`;
 
     html+=`</div>`;
-    html+='<div class="source-credit">Sources: sunrise-sunset.org · NY Open Data (data.ny.gov)</div>';
+    html+='<div class="source-credit">Sources: sunrise-sunset.org · NY Open Data · vtlottery.com</div>';
     document.getElementById('body-extras').innerHTML=stampUpdated(html);
   } catch(e){ setError('body-extras',e.message); }
 }
