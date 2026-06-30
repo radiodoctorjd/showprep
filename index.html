@@ -575,24 +575,35 @@ async function loadBirthdays(){
       const age=ageMatch?parseInt(ageMatch[1],10):null;
       const titleAndName=headingText.replace(/,\s*\d{1,3}\s*$/,'').trim();
 
-      // Walk forward through siblings until the next H2 to gather bio text + link
-      let bioText='', factText='', link=null, node=h.nextElementSibling;
-      let guard=0;
-      while(node && node.tagName!=='H2' && guard<25){
-        const t=(node.textContent||'').trim();
-        if(t){
-          if(/^little-known fact/i.test(t)){
-            factText=t.replace(/^little-known fact:?\s*/i,'').trim();
-          } else if(!bioText && t.length>40){
-            bioText=t;
-          }
-        }
+      // Collect every <p> between this h2 and the next h2 (siblings AND nested,
+      // since Bored Panda wraps content in figure/div containers, not flat siblings)
+      const paras=[];
+      let link=null, node=h.nextElementSibling, guard=0;
+      while(node && node.tagName!=='H2' && guard<40){
+        node.querySelectorAll?node.querySelectorAll('p'):[];
+        const ps=node.tagName==='P'?[node]:Array.from(node.querySelectorAll?node.querySelectorAll('p'):[]);
+        ps.forEach(p=>{
+          const t=(p.textContent||'').replace(/\s+/g,' ').trim();
+          if(t) paras.push(t);
+        });
         if(!link){
           const a=node.querySelector?node.querySelector('a[href*="boredpanda.com"]'):null;
-          if(a && /bio-and-career-highlights|wikipedia/i.test(a.href)) link=a.href;
+          if(a && /bio-and-career-highlights/i.test(a.href)) link=a.href;
         }
         node=node.nextElementSibling;
         guard++;
+      }
+
+      // Boilerplate to ignore: nav/share/footer junk that sometimes shows up as <p>
+      const isJunk=t=>/^(report|share|post|published|advertisement|related:)/i.test(t)||t.length<30;
+
+      let bioText='', factText='';
+      for(const t of paras){
+        if(/^little-known fact/i.test(t)){
+          factText=t.replace(/^little-known fact:?\s*/i,'').trim();
+        } else if(!bioText && !isJunk(t)){
+          bioText=t;
+        }
       }
 
       return {titleAndName, age, bioText, factText, link};
@@ -607,8 +618,8 @@ async function loadBirthdays(){
           <div class="birthday-age"><br/><span style="font-size:13px">${p.age}</span></div>
           <div style="flex:1">
             <div class="birthday-name">${p.link?`<a href="${p.link}" target="_blank">${p.titleAndName}</a>`:p.titleAndName}</div>
-            ${p.bioText?`<div class="birthday-note" style="color:var(--text);font-size:12px;line-height:1.5;margin-top:2px">${p.bioText}</div>`:''}
-            ${p.factText?`<div class="birthday-note" style="color:var(--gold);font-size:12px;margin-top:4px">✨ ${p.factText}</div>`:''}
+            ${p.bioText?`<div class="birthday-note" style="color:var(--text);font-size:13px;line-height:1.55;margin-top:3px">${p.bioText}</div>`:''}
+            ${p.factText?`<div class="birthday-note" style="color:var(--gold);font-size:12px;margin-top:5px"><strong>Fun fact:</strong> ${p.factText}</div>`:''}
           </div>
         </div>`;
       });
