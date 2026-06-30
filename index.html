@@ -569,33 +569,55 @@ async function loadBirthdays(){
 
     if(headings.length===0) throw new Error('No birthday entries found on page');
 
-    const people=headings.map(h=>{
+    // Build a flat, document-order list of every text-bearing node (paragraphs,
+    // list items, divs with direct text) and every link on the page. Then for
+    // each heading, take all such nodes that fall after it and before the next
+    // heading. This avoids depending on any particular nesting/sibling shape —
+    // it only relies on document order, which always holds regardless of how
+    // Bored Panda wraps each entry (div, figure, section, etc).
+    const POS_FOLLOWING=4; // Node.DOCUMENT_POSITION_FOLLOWING
+    const allTextNodes=Array.from(doc.querySelectorAll('p, li'))
+      .map(n=>({node:n, text:(n.textContent||'').replace(/\s+/g,' ').trim()}))
+      .filter(o=>o.text.length>0);
+    // Fallback pool: any div/span whose *direct* text (not just descendant text)
+    // is substantial — covers sites that don't wrap body copy in <p>
+    const fallbackTextNodes=Array.from(doc.querySelectorAll('div, span'))
+      .map(n=>{
+        const direct=Array.from(n.childNodes)
+          .filter(c=>c.nodeType===3)
+          .map(c=>c.textContent)
+          .join(' ').replace(/\s+/g,' ').trim();
+        return {node:n, text:direct};
+      })
+      .filter(o=>o.text.length>40);
+    const allLinks=Array.from(doc.querySelectorAll('a[href*="boredpanda.com"]'))
+      .filter(a=>/bio-and-career-highlights/i.test(a.href));
+
+    function isBetween(node, afterHeading, beforeHeading){
+      const afterOK=!!(afterHeading.compareDocumentPosition(node)&POS_FOLLOWING);
+      const beforeOK=!beforeHeading||!!(node.compareDocumentPosition(beforeHeading)&POS_FOLLOWING);
+      return afterOK&&beforeOK;
+    }
+
+    const people=headings.map((h,i)=>{
       const headingText=h.textContent.trim();
       const ageMatch=headingText.match(/,\s*(\d{1,3})\s*$/);
       const age=ageMatch?parseInt(ageMatch[1],10):null;
       const titleAndName=headingText.replace(/,\s*\d{1,3}\s*$/,'').trim();
+      const nextHeading=headings[i+1]||null;
 
-      // Collect every <p> between this h2 and the next h2 (siblings AND nested,
-      // since Bored Panda wraps content in figure/div containers, not flat siblings)
-      const paras=[];
-      let link=null, node=h.nextElementSibling, guard=0;
-      while(node && node.tagName!=='H2' && guard<40){
-        node.querySelectorAll?node.querySelectorAll('p'):[];
-        const ps=node.tagName==='P'?[node]:Array.from(node.querySelectorAll?node.querySelectorAll('p'):[]);
-        ps.forEach(p=>{
-          const t=(p.textContent||'').replace(/\s+/g,' ').trim();
-          if(t) paras.push(t);
-        });
-        if(!link){
-          const a=node.querySelector?node.querySelector('a[href*="boredpanda.com"]'):null;
-          if(a && /bio-and-career-highlights/i.test(a.href)) link=a.href;
-        }
-        node=node.nextElementSibling;
-        guard++;
+      let paras=allTextNodes
+        .filter(o=>isBetween(o.node,h,nextHeading))
+        .map(o=>o.text);
+      if(paras.length===0){
+        paras=fallbackTextNodes
+          .filter(o=>isBetween(o.node,h,nextHeading))
+          .map(o=>o.text);
       }
+      const link=allLinks.find(a=>isBetween(a,h,nextHeading));
 
       // Boilerplate to ignore: nav/share/footer junk that sometimes shows up as <p>
-      const isJunk=t=>/^(report|share|post|published|advertisement|related:)/i.test(t)||t.length<30;
+      const isJunk=t=>/^(report|share|post|published|advertisement|related:|wikimedia)/i.test(t)||t.length<30;
 
       let bioText='', factText='';
       for(const t of paras){
@@ -606,7 +628,7 @@ async function loadBirthdays(){
         }
       }
 
-      return {titleAndName, age, bioText, factText, link};
+      return {titleAndName, age, bioText, factText, link:link?link.href:null};
     }).filter(p=>p.age!==null && p.titleAndName);
 
     if(people.length===0) throw new Error('Could not parse entries from page');
