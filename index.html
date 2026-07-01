@@ -573,6 +573,9 @@ async function loadBirthdays(){
 
     // Each person is a link to /people/{slug}.html whose text is
     // "Name Name, AGE Occupation N" (N = popularity rank, trailing digits)
+    // Occupation categories to skip entirely — not useful for on-air radio content
+    const excludedOccupations=/^(youtube star|tiktok star|twitch star|instagram star|snapchat star|podcaster|blogger|web series star|content creator)$/i;
+
     const links=Array.from(doc.querySelectorAll('a[href*="/people/"]'));
     const seen=new Set();
     const people=[];
@@ -585,6 +588,7 @@ async function loadBirthdays(){
       if(!m) continue;
       const age=parseInt(m[1],10);
       const occupation=m[2].trim();
+      if(excludedOccupations.test(occupation)) continue;
       // Name is everything before the ", AGE" — text sometimes doubles the name
       // ("Britain Noelle Britain Noelle, 12") so dedupe by taking the second half
       const namePart=text.slice(0,text.indexOf(','+m[1])===-1?text.indexOf(', '+m[1]):text.indexOf(', '+m[1])).trim();
@@ -609,21 +613,23 @@ async function loadBirthdays(){
       `<div class="birthday-list">${people.map(renderBirthdayRow).join('')}</div>`+
       `<div class="source-credit">Source: <a href="${listUrl}" target="_blank" style="color:inherit">FamousBirthdays.com</a></div>`;
 
-    // Fetch each profile page in parallel and fill in the credit as it lands
-    await Promise.allSettled(people.map(async p=>{
+    // Fetch each profile page for its "known for" credit. Staggered (not all
+    // at once) because CORS proxies throttle bursts of simultaneous requests —
+    // firing 10 at once was causing most of them to fail silently.
+    for(const p of people){
       try{
         const pdoc=await fetchHTML(p.link);
         const meta=pdoc.querySelector('meta[name="description"]')||pdoc.querySelector('meta[property="og:description"]');
-        let credit=(meta&&meta.getAttribute('content')||'').trim();
-        if(credit){
-          const row=document.getElementById(`bday-${p.slug}`);
-          if(row){
-            const slot=row.querySelector('.bio-slot');
-            if(slot) slot.textContent=credit;
-          }
-        }
-      } catch(e){ /* leave the "…" placeholder if a profile fetch fails */ }
-    }));
+        const credit=(meta&&meta.getAttribute('content')||'').trim();
+        const row=document.getElementById(`bday-${p.slug}`);
+        const slot=row&&row.querySelector('.bio-slot');
+        if(slot) slot.textContent=credit||`${p.occupation}.`;
+      } catch(e){
+        const row=document.getElementById(`bday-${p.slug}`);
+        const slot=row&&row.querySelector('.bio-slot');
+        if(slot) slot.textContent=`${p.occupation}.`;
+      }
+    }
 
     const container=document.getElementById('body-birthdays');
     container.innerHTML=container.innerHTML+`<div class="last-updated">Updated ${new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit'})}</div>`;
