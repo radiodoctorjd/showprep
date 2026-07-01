@@ -509,11 +509,12 @@ async function loadHistory(){
 }
 
 /* ══════════════════════════════════════════
-   CELEBRITY BIRTHDAYS — Bored Panda daily roundup
-   URL pattern: celebrity-birthdays-today-{month}-{day}-{year}
+   CELEBRITY BIRTHDAYS — FamousBirthdays.com
+   List page: famousbirthdays.com/{month}{day}.html
+   Each profile page carries a one-line "known for" in its meta description —
+   e.g. "Best known as Detective Robert Goren in Law and Order: Criminal Intent."
 ══════════════════════════════════════════ */
 async function fetchHTML(url){
-  // Same proxy chain as fetchRSS, but returns parsed HTML (not XML)
   const proxies=[
     async (u)=>{
       const r=await fetch('https://corsproxy.io/?url='+encodeURIComponent(u));
@@ -548,140 +549,90 @@ async function fetchHTML(url){
   throw new Error('All HTML proxies failed: '+(lastErr&&lastErr.message));
 }
 
+const BIRTHDAY_COUNT=10;
+
+function renderBirthdayRow(p){
+  return `<div class="birthday-row" id="bday-${p.slug}">
+    <div class="birthday-age"><br/><span style="font-size:13px">${p.age}</span></div>
+    <div style="flex:1">
+      <div class="birthday-name">${p.link?`<a href="${p.link}" target="_blank">${p.name}</a>`:p.name}</div>
+      <div class="birthday-note" style="color:var(--c-birth);font-size:11px;text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-top:1px">${p.occupation}</div>
+      <div class="birthday-note bio-slot" style="color:var(--text);font-size:13px;line-height:1.4;margin-top:3px">${p.credit||'<span style="color:var(--dim)">…</span>'}</div>
+    </div>
+  </div>`;
+}
+
 async function loadBirthdays(){
   setLoading('body-birthdays');
   try {
     const monthNames=['january','february','march','april','may','june','july',
       'august','september','october','november','december'];
-    const month=monthNames[TODAY.getMonth()];
-    const day=TODAY.getDate();
-    const year=TODAY.getFullYear();
-    const pageUrl=`https://www.boredpanda.com/celebrity-birthdays-today-${month}-${day}-${year}/`;
+    const listUrl=`https://www.famousbirthdays.com/${monthNames[TODAY.getMonth()]}${TODAY.getDate()}.html`;
 
-    const doc=await fetchHTML(pageUrl);
+    const doc=await fetchHTML(listUrl);
 
-    // Each entry is an <h2> like "American Actor Vincent D'onofrio, 67"
-    // followed by a figure/image and a paragraph of bio text, then a
-    // "Little-known fact:" paragraph. We walk the DOM from each h2 forward
-    // to the next h2, collecting the bio paragraph + fact + profile link.
-    const headings=Array.from(doc.querySelectorAll('h2'))
-      .filter(h=>/,\s*\d{1,3}\s*$/.test(h.textContent.trim())); // ends in ", NN"
-
-    if(headings.length===0) throw new Error('No birthday entries found on page');
-
-    // Build a flat, document-order list of every text-bearing node (paragraphs,
-    // list items, divs with direct text) and every link on the page. Then for
-    // each heading, take all such nodes that fall after it and before the next
-    // heading. This avoids depending on any particular nesting/sibling shape —
-    // it only relies on document order, which always holds regardless of how
-    // Bored Panda wraps each entry (div, figure, section, etc).
-    const POS_FOLLOWING=4; // Node.DOCUMENT_POSITION_FOLLOWING
-    const allTextNodes=Array.from(doc.querySelectorAll('p, li'))
-      .map(n=>({node:n, text:(n.textContent||'').replace(/\s+/g,' ').trim()}))
-      .filter(o=>o.text.length>0);
-    // Fallback pool: any div/span whose *direct* text (not just descendant text)
-    // is substantial — covers sites that don't wrap body copy in <p>
-    const fallbackTextNodes=Array.from(doc.querySelectorAll('div, span'))
-      .map(n=>{
-        const direct=Array.from(n.childNodes)
-          .filter(c=>c.nodeType===3)
-          .map(c=>c.textContent)
-          .join(' ').replace(/\s+/g,' ').trim();
-        return {node:n, text:direct};
-      })
-      .filter(o=>o.text.length>40);
-    const allLinks=Array.from(doc.querySelectorAll('a[href*="boredpanda.com"]'))
-      .filter(a=>/bio-and-career-highlights/i.test(a.href));
-
-    function isBetween(node, afterHeading, beforeHeading){
-      const afterOK=!!(afterHeading.compareDocumentPosition(node)&POS_FOLLOWING);
-      const beforeOK=!beforeHeading||!!(node.compareDocumentPosition(beforeHeading)&POS_FOLLOWING);
-      return afterOK&&beforeOK;
+    // Each person is a link to /people/{slug}.html whose text is
+    // "Name Name, AGE Occupation N" (N = popularity rank, trailing digits)
+    const links=Array.from(doc.querySelectorAll('a[href*="/people/"]'));
+    const seen=new Set();
+    const people=[];
+    for(const a of links){
+      const href=a.href;
+      if(seen.has(href)) continue;
+      const text=(a.textContent||'').replace(/\s+/g,' ').trim();
+      // Pattern: "<Name repeated?> Name, AGE Occupation <rank digits>"
+      const m=text.match(/,\s*(\d{1,3})\s+([A-Za-z][A-Za-z .&'\-]*?)\s*\d*$/);
+      if(!m) continue;
+      const age=parseInt(m[1],10);
+      const occupation=m[2].trim();
+      // Name is everything before the ", AGE" — text sometimes doubles the name
+      // ("Britain Noelle Britain Noelle, 12") so dedupe by taking the second half
+      const namePart=text.slice(0,text.indexOf(','+m[1])===-1?text.indexOf(', '+m[1]):text.indexOf(', '+m[1])).trim();
+      const words=namePart.split(' ');
+      let name=namePart;
+      if(words.length%2===0){
+        const half=words.length/2;
+        if(words.slice(0,half).join(' ')===words.slice(half).join(' ')) name=words.slice(half).join(' ');
+      }
+      if(!name||!age||!occupation) continue;
+      seen.add(href);
+      const slug=href.split('/people/')[1].replace('.html','');
+      people.push({name, age, occupation, link:href, slug, credit:null});
+      if(people.length>=BIRTHDAY_COUNT) break;
     }
 
-    const people=headings.map((h,i)=>{
-      const headingText=h.textContent.trim();
-      const ageMatch=headingText.match(/,\s*(\d{1,3})\s*$/);
-      const age=ageMatch?parseInt(ageMatch[1],10):null;
-      const fullTitle=headingText.replace(/,\s*\d{1,3}\s*$/,'').trim();
-      // The heading is "Nationality Job-Title(s) Full Name" — for a quick on-air
-      // glance, just the name is enough (the bio sentence covers the rest).
-      // Heuristic: the name is the longest trailing run of capitalized words
-      // that isn't itself a known job-title word.
-      const jobWords=new Set(['american','canadian','british','english','scottish','irish','australian',
-        'german','french','italian','spanish','uk-based','actor','actress','singer','musician','rapper',
-        'comedian','director','producer','songwriter','television','host','presenter','journalist',
-        'author','novelist','politician','athlete','player','youtuber','and','&','singer-songwriter',
-        'multi-instrumentalist','filmmaker','entrepreneur','personality']);
-      const words=fullTitle.split(' ');
-      let nameStart=words.length;
-      for(let i=words.length-1;i>=0;i--){
-        const bare=words[i].toLowerCase().replace(/[^a-z\-]/g,'');
-        if(jobWords.has(bare)) break;
-        nameStart=i;
-      }
-      const titleAndName=words.slice(nameStart).join(' ').trim()||fullTitle;
-      const nextHeading=headings[i+1]||null;
+    if(people.length===0) throw new Error('No birthday entries found on list page');
 
-      let paras=allTextNodes
-        .filter(o=>isBetween(o.node,h,nextHeading))
-        .map(o=>o.text);
-      if(paras.length===0){
-        paras=fallbackTextNodes
-          .filter(o=>isBetween(o.node,h,nextHeading))
-          .map(o=>o.text);
-      }
-      const link=allLinks.find(a=>isBetween(a,h,nextHeading));
+    // Render immediately with name/age/occupation so the panel isn't blank
+    // while we fetch each profile page for the specific "known for" credit
+    document.getElementById('body-birthdays').innerHTML=
+      `<div class="birthday-list">${people.map(renderBirthdayRow).join('')}</div>`+
+      `<div class="source-credit">Source: <a href="${listUrl}" target="_blank" style="color:inherit">FamousBirthdays.com</a></div>`;
 
-      // Boilerplate to ignore: nav/share/footer junk that sometimes shows up as <p>
-      const isJunk=t=>/^(report|share|post|published|advertisement|related:|wikimedia)/i.test(t)||t.length<30;
-
-      let bioText='', factText='';
-      for(const t of paras){
-        if(/^little-known fact/i.test(t)){
-          factText=t.replace(/^little-known fact:?\s*/i,'').trim();
-        } else if(!bioText && !isJunk(t)){
-          bioText=t;
+    // Fetch each profile page in parallel and fill in the credit as it lands
+    await Promise.allSettled(people.map(async p=>{
+      try{
+        const pdoc=await fetchHTML(p.link);
+        const meta=pdoc.querySelector('meta[name="description"]')||pdoc.querySelector('meta[property="og:description"]');
+        let credit=(meta&&meta.getAttribute('content')||'').trim();
+        if(credit){
+          const row=document.getElementById(`bday-${p.slug}`);
+          if(row){
+            const slot=row.querySelector('.bio-slot');
+            if(slot) slot.textContent=credit;
+          }
         }
-      }
-      // On-air tightening: just the first sentence — that's always the
-      // "why they're famous" line; everything after is award-list padding
-      const firstSentence=(bioText.match(/^[^.!?]+[.!?]/)||[bioText])[0].trim();
-      // Shorten the fun fact to one sentence too, and drop the redundant
-      // "Before/After their X career" scaffolding when possible
-      const factFirstSentence=(factText.match(/^[^.!?]+[.!?]/)||[factText])[0].trim();
+      } catch(e){ /* leave the "…" placeholder if a profile fetch fails */ }
+    }));
 
-      return {titleAndName, age, bioText:firstSentence, factText:factFirstSentence, link:link?link.href:null};
-    }).filter(p=>p.age!==null && p.titleAndName);
-
-    if(people.length===0) throw new Error('Could not parse entries from page');
-
-    function renderBirthdays(list){
-      let html='<div class="birthday-list">';
-      list.forEach(p=>{
-        html+=`<div class="birthday-row">
-          <div class="birthday-age"><br/><span style="font-size:13px">${p.age}</span></div>
-          <div style="flex:1">
-            <div class="birthday-name">${p.link?`<a href="${p.link}" target="_blank">${p.titleAndName}</a>`:p.titleAndName}</div>
-            ${p.bioText?`<div class="birthday-note" style="color:var(--text);font-size:13px;line-height:1.4;margin-top:2px">${p.bioText}</div>`:''}
-            ${p.factText?`<div class="birthday-note" style="color:var(--gold);font-size:12px;margin-top:4px">🎙️ ${p.factText}</div>`:''}
-          </div>
-        </div>`;
-      });
-      html+='</div>';
-      return html;
-    }
-
-    document.getElementById('body-birthdays').innerHTML=stampUpdated(
-      renderBirthdays(people)+
-      `<div class="source-credit">Source: <a href="${pageUrl}" target="_blank" style="color:inherit">Bored Panda</a></div>`
-    );
+    const container=document.getElementById('body-birthdays');
+    container.innerHTML=container.innerHTML+`<div class="last-updated">Updated ${new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit'})}</div>`;
   } catch(e){
     const monthNames=['january','february','march','april','may','june','july',
       'august','september','october','november','december'];
-    const pageUrl=`https://www.boredpanda.com/celebrity-birthdays-today-${monthNames[TODAY.getMonth()]}-${TODAY.getDate()}-${TODAY.getFullYear()}/`;
+    const listUrl=`https://www.famousbirthdays.com/${monthNames[TODAY.getMonth()]}${TODAY.getDate()}.html`;
     document.getElementById('body-birthdays').innerHTML=
-      `<div class="error-state">No data today — <a href="${pageUrl}" target="_blank">view on Bored Panda</a></div>`;
+      `<div class="error-state">No data today — <a href="${listUrl}" target="_blank">view on FamousBirthdays.com</a></div>`;
   }
 }
 
