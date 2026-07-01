@@ -868,15 +868,17 @@ async function loadMusicNews(){
 async function loadNews(){
   setLoading('body-news');
   try {
-    const [wcaxRes,vtRes]=await Promise.allSettled([
+    const [wcaxRes,vtRes,addyRes,vbizRes]=await Promise.allSettled([
       fetchRSS('https://www.wcax.com/arc/outboundfeeds/whiz-rss/category/news/?outputType=xml&sort=display_date:desc&size=50'),
-      fetchRSS('https://vtdigger.org/feed/')
+      fetchRSS('https://vtdigger.org/feed/'),
+      fetchRSS('https://www.addisonindependent.com/feed'),
+      fetchRSS('https://vermontbiz.com/rss.xml')
     ]);
 
     const items=[];
 
     if(wcaxRes.status==='fulfilled'){
-      Array.from(wcaxRes.value.querySelectorAll('item')).slice(0,6).forEach(item=>{
+      Array.from(wcaxRes.value.querySelectorAll('item')).slice(0,5).forEach(item=>{
         items.push({
           title:strip(item.querySelector('title')?.textContent||''),
           link:item.querySelector('link')?.textContent?.trim()||item.querySelector('guid')?.textContent?.trim()||'',
@@ -897,6 +899,28 @@ async function loadNews(){
       });
     }
 
+    if(addyRes.status==='fulfilled'){
+      Array.from(addyRes.value.querySelectorAll('item')).slice(0,5).forEach(item=>{
+        items.push({
+          title:strip(item.querySelector('title')?.textContent||''),
+          link:item.querySelector('link')?.textContent?.trim()||item.querySelector('guid')?.textContent?.trim()||'',
+          date:fmt(item.querySelector('pubDate')?.textContent||''),
+          source:'Addison Independent'
+        });
+      });
+    }
+
+    if(vbizRes.status==='fulfilled'){
+      Array.from(vbizRes.value.querySelectorAll('item')).slice(0,4).forEach(item=>{
+        items.push({
+          title:strip(item.querySelector('title')?.textContent||''),
+          link:item.querySelector('link')?.textContent?.trim()||item.querySelector('guid')?.textContent?.trim()||'',
+          date:fmt(item.querySelector('pubDate')?.textContent||''),
+          source:'VermontBiz'
+        });
+      });
+    }
+
     if(items.length===0) throw new Error('No news items loaded');
 
     let html='';
@@ -906,7 +930,7 @@ async function loadNews(){
         <div class="item-title">${h.link?`<a href="${h.link}" target="_blank">${h.title}</a>`:h.title}</div>
       </div>`;
     });
-    html+='<div class="source-credit">Sources: WCAX · VT Digger</div>';
+    html+='<div class="source-credit">Sources: WCAX · VT Digger · Addison Independent · VermontBiz</div>';
     document.getElementById('body-news').innerHTML=stampUpdated(html);
   } catch(e){ setError('body-news',e.message); }
 }
