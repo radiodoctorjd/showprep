@@ -549,7 +549,7 @@ async function fetchHTML(url){
   throw new Error('All HTML proxies failed: '+(lastErr&&lastErr.message));
 }
 
-const BIRTHDAY_COUNT=10;
+const BIRTHDAY_COUNT=20;
 
 // The profile page's meta description sometimes just restates the occupation
 // tag we're already showing on its own line (e.g. occupation="TV Actor",
@@ -628,8 +628,14 @@ async function loadBirthdays(){
       if(!name||!age||!occupation) continue;
       seen.add(href);
       people.push({name, age, occupation, link:href, slug, credit:null});
-      if(people.length>=BIRTHDAY_COUNT) break;
+      // No early break — the page lists ~48 people and social-media-star
+      // entries are skipped above, so stopping at the first N raw matches
+      // would miss real celebrities (actors, musicians, athletes) who
+      // appear further down the list, behind the excluded social entries.
     }
+    // Now take the top BIRTHDAY_COUNT from the full filtered list, in the
+    // order the site presents them (roughly popularity-ranked)
+    people.splice(BIRTHDAY_COUNT);
 
     if(people.length===0) throw new Error('No birthday entries found on list page');
 
