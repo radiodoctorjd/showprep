@@ -765,9 +765,10 @@ async function loadMusicNews(){
   setLoading('body-musicnews');
   try {
     // RTTNews Music RSS — covers all genres, filter for classic/rock
-    const [rttRes, ucrRes] = await Promise.allSettled([
+    const [rttRes, ucrRes, buzzRes] = await Promise.allSettled([
       fetchRSS('https://www.rttnews.com/RSS/MusicNews.xml'),
-      fetchRSS('https://ultimateclassicrock.com/feed/')
+      fetchRSS('https://ultimateclassicrock.com/feed/'),
+      fetchRSS('https://news.google.com/rss/search?q=classic+rock+OR+music+tour+OR+concert+OR+album+when:3d&hl=en-US&gl=US&ceid=US:en')
     ]);
 
     const classicRockTerms=['classic rock','rock','band','guitar','album','tour','concert',
@@ -805,7 +806,7 @@ async function loadMusicNews(){
       });
     }
 
-    if(allItems.length===0) throw new Error('No music news loaded');
+    if(allItems.length===0 && buzzRes.status!=='fulfilled') throw new Error('No music news loaded');
 
     // Sort by score desc, dedupe
     const seen=new Set();
@@ -813,6 +814,21 @@ async function loadMusicNews(){
       .sort((a,b)=>b.score-a.score)
       .filter(i=>{ const k=i.title.slice(0,30).toLowerCase(); if(seen.has(k)) return false; seen.add(k); return true; })
       .slice(0,12);
+
+    // Music Buzz — Google News search results, kept as its own labeled group
+    // rather than blended into the scored RTTNews/UCR list above
+    const buzzItems=[];
+    if(buzzRes.status==='fulfilled'){
+      Array.from(buzzRes.value.querySelectorAll('item')).slice(0,5).forEach(item=>{
+        const title=strip(item.querySelector('title')?.textContent||'');
+        let link='';
+        if(item._item&&item._item.link) link=item._item.link.trim();
+        else link=(item.querySelector('link')?.textContent||'').trim();
+        const pubDate=fmt(item.querySelector('pubDate')?.textContent||'');
+        const publisher=item.querySelector('source')?.textContent?.trim()||'';
+        if(title && !seen.has(title.slice(0,30).toLowerCase())) buzzItems.push({title,link,pubDate,publisher});
+      });
+    }
 
     let html='';
     sorted.forEach(item=>{
@@ -822,7 +838,26 @@ async function loadMusicNews(){
         ${item.desc?`<div class="item-body">${item.desc}${item.desc.length>=120?'…':''}</div>`:''}
       </div>`;
     });
-    html+='<div class="source-credit">Sources: <a href="https://www.rttnews.com/list/classic-rock-music.aspx" target="_blank" style="color:var(--gold)">RTTNews Classic Rock</a> · Ultimate Classic Rock</div>';
+
+    if(buzzItems.length){
+      html+=`<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
+        <div class="item-label" style="margin-bottom:6px"> Music Buzz</div>`;
+      buzzItems.forEach(item=>{
+        html+=`<div style="padding:6px 0;border-bottom:1px solid var(--border)">
+          <div style="font-size:14px;line-height:1.45;margin-bottom:2px">
+            ${item.link
+              ?`<a href="${item.link}" target="_blank" style="color:var(--text);text-decoration:none;font-weight:600">${item.title}</a>`
+              :`<span style="color:var(--text);font-weight:600">${item.title}</span>`}
+          </div>
+          <div style="font-family:'Courier Prime',monospace;font-size:10px;color:var(--dim)">
+            ${item.publisher?item.publisher+' · ':''}${item.pubDate}
+          </div>
+        </div>`;
+      });
+      html+='</div>';
+    }
+
+    html+='<div class="source-credit">Sources: <a href="https://www.rttnews.com/list/classic-rock-music.aspx" target="_blank" style="color:var(--gold)">RTTNews Classic Rock</a> · Ultimate Classic Rock · Google News</div>';
     document.getElementById('body-musicnews').innerHTML=stampUpdated(html);
   } catch(e){ setError('body-musicnews',e.message); }
 }
@@ -893,10 +928,6 @@ async function loadTrending(){
       {
         url:'https://news.google.com/rss/search?q=trending+news+today+US+when:1d&hl=en-US&gl=US&ceid=US:en',
         cat:' Top Stories', limit:5
-      },
-      {
-        url:'https://news.google.com/rss/search?q=classic+rock+OR+music+tour+OR+concert+OR+album+when:3d&hl=en-US&gl=US&ceid=US:en',
-        cat:' Music Buzz', limit:4
       },
       {
         url:'https://news.google.com/rss/search?q="only+in+"+OR+"you+can%27t+make+this+up"+OR+"study+finds"+OR+"survey+says"+OR+"goes+viral"+OR+"world+record"+OR+bizarre+OR+unusual+when:3d&hl=en-US&gl=US&ceid=US:en',
