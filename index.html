@@ -641,11 +641,20 @@ async function loadBirthdays(){
         const pdoc=await fetchHTML(p.link);
         const meta=pdoc.querySelector('meta[name="description"]')||pdoc.querySelector('meta[property="og:description"]');
         let credit=(meta&&meta.getAttribute('content')||'').trim();
+        if(!credit){
+          // Nothing in meta tags — try the "About" section's first paragraph as a backup
+          const aboutHeader=Array.from(pdoc.querySelectorAll('h2,h3')).find(h=>/about/i.test(h.textContent));
+          const aboutPara=aboutHeader&&(aboutHeader.nextElementSibling&&aboutHeader.nextElementSibling.tagName==='P'
+            ?aboutHeader.nextElementSibling:pdoc.querySelector('.bio, .about, [class*="about"] p'));
+          if(aboutPara) credit=(aboutPara.textContent||'').replace(/\s+/g,' ').trim();
+        }
+        console.log('[birthdays]',p.name,'credit found:',credit||'(none — meta tags empty)');
         credit=stripRedundantOccupation(credit,p.occupation);
         const row=document.getElementById(`bday-${p.slug}`);
         const slot=row&&row.querySelector('.bio-slot');
         if(slot) slot.textContent=credit||`${p.occupation}.`;
       } catch(e){
+        console.log('[birthdays]',p.name,'fetch failed:',e.message);
         const row=document.getElementById(`bday-${p.slug}`);
         const slot=row&&row.querySelector('.bio-slot');
         if(slot) slot.textContent=`${p.occupation}.`;
