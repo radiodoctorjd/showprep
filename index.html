@@ -875,51 +875,33 @@ async function loadNews(){
       fetchRSS('https://vermontbiz.com/rss.xml')
     ]);
 
-    const items=[];
+    // A little slack (2 hours) for clock-skew/timezone quirks between feeds
+    // and the browser, but anything published further into the future than
+    // that is almost certainly a feed bug (seen from VermontBiz) rather than
+    // a real story, so drop it instead of showing a "future" headline.
+    const cutoff=new Date(Date.now()+2*60*60*1000);
 
-    if(wcaxRes.status==='fulfilled'){
-      Array.from(wcaxRes.value.querySelectorAll('item')).slice(0,5).forEach(item=>{
-        items.push({
+    function pullItems(res,source,limit){
+      if(res.status!=='fulfilled') return [];
+      return Array.from(res.value.querySelectorAll('item')).slice(0,limit).map(item=>{
+        const rawDate=item.querySelector('pubDate')?.textContent||'';
+        const parsed=new Date(rawDate);
+        return {
           title:strip(item.querySelector('title')?.textContent||''),
           link:item.querySelector('link')?.textContent?.trim()||item.querySelector('guid')?.textContent?.trim()||'',
-          date:fmt(item.querySelector('pubDate')?.textContent||''),
-          source:'WCAX'
-        });
-      });
+          rawDate, parsed,
+          date:fmt(rawDate),
+          source
+        };
+      }).filter(i=>i.title && (isNaN(i.parsed)||i.parsed<=cutoff));
     }
 
-    if(vtRes.status==='fulfilled'){
-      Array.from(vtRes.value.querySelectorAll('item')).slice(0,4).forEach(item=>{
-        items.push({
-          title:strip(item.querySelector('title')?.textContent||''),
-          link:item.querySelector('link')?.textContent?.trim()||item.querySelector('guid')?.textContent?.trim()||'',
-          date:fmt(item.querySelector('pubDate')?.textContent||''),
-          source:'VT Digger'
-        });
-      });
-    }
-
-    if(addyRes.status==='fulfilled'){
-      Array.from(addyRes.value.querySelectorAll('item')).slice(0,5).forEach(item=>{
-        items.push({
-          title:strip(item.querySelector('title')?.textContent||''),
-          link:item.querySelector('link')?.textContent?.trim()||item.querySelector('guid')?.textContent?.trim()||'',
-          date:fmt(item.querySelector('pubDate')?.textContent||''),
-          source:'Addison Independent'
-        });
-      });
-    }
-
-    if(vbizRes.status==='fulfilled'){
-      Array.from(vbizRes.value.querySelectorAll('item')).slice(0,4).forEach(item=>{
-        items.push({
-          title:strip(item.querySelector('title')?.textContent||''),
-          link:item.querySelector('link')?.textContent?.trim()||item.querySelector('guid')?.textContent?.trim()||'',
-          date:fmt(item.querySelector('pubDate')?.textContent||''),
-          source:'VermontBiz'
-        });
-      });
-    }
+    const items=[
+      ...pullItems(wcaxRes,'WCAX',5),
+      ...pullItems(vtRes,'VT Digger',4),
+      ...pullItems(addyRes,'Addison Independent',5),
+      ...pullItems(vbizRes,'VermontBiz',4)
+    ];
 
     if(items.length===0) throw new Error('No news items loaded');
 
