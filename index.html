@@ -597,7 +597,17 @@ async function loadBirthdays(){
     const seen=new Set();
     const people=[];
     for(const a of links){
-      const href=a.href;
+      // IMPORTANT: use getAttribute, not the .href property — .href resolves
+      // relative URLs against *this page's* origin (radiodoctorjd.github.io),
+      // not famousbirthdays.com, since the proxied HTML was parsed into a
+      // document living on our own origin. The raw attribute preserves the
+      // original path as written in the source so we can build the correct
+      // absolute URL ourselves.
+      const rawHref=a.getAttribute('href')||'';
+      const slugMatch=rawHref.match(/\/people\/([^\/?#]+)\.html/);
+      if(!slugMatch) continue;
+      const slug=slugMatch[1];
+      const href=`https://www.famousbirthdays.com/people/${slug}.html`;
       if(seen.has(href)) continue;
       const text=(a.textContent||'').replace(/\s+/g,' ').trim();
       // Pattern: "<Name repeated?> Name, AGE Occupation <rank digits>"
@@ -617,7 +627,6 @@ async function loadBirthdays(){
       }
       if(!name||!age||!occupation) continue;
       seen.add(href);
-      const slug=href.split('/people/')[1].replace('.html','');
       people.push({name, age, occupation, link:href, slug, credit:null});
       if(people.length>=BIRTHDAY_COUNT) break;
     }
