@@ -141,6 +141,11 @@
     <div class="card-body" id="body-news"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
   </div>
 
+  <div class="card span2" style="--accent:#16A34A">
+    <div class="card-header"><div class="card-title"> Sports</div><button class="refresh-btn" onclick="loadSports()" title="Refresh">↻</button></div>
+    <div class="card-body" id="body-sports"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
+  </div>
+
   <div class="card" style="--accent:#8B5CF6">
     <div class="card-header"><div class="card-title"> Music News</div><button class="refresh-btn" onclick="loadMusicNews()" title="Refresh">↻</button></div>
     <div class="card-body" id="body-musicnews"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
@@ -169,11 +174,6 @@
   <div class="card" style="--accent:#7C3AED">
     <div class="card-header"><div class="card-title"> National Days</div><button class="refresh-btn" onclick="loadNationalDay()" title="Refresh">↻</button></div>
     <div class="card-body" id="body-nationalday"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
-  </div>
-
-  <div class="card span2" style="--accent:#16A34A">
-    <div class="card-header"><div class="card-title"> Sports</div><button class="refresh-btn" onclick="loadSports()" title="Refresh">↻</button></div>
-    <div class="card-body" id="body-sports"><div class="loading-state"><div class="spinner"></div>Loading…</div></div>
   </div>
 
   <div class="card" style="--accent:#F59E0B">
@@ -591,7 +591,7 @@ async function loadBirthdays(){
     // Each person is a link to /people/{slug}.html whose text is
     // "Name Name, AGE Occupation N" (N = popularity rank, trailing digits)
     // Occupation categories to skip entirely — not useful for on-air radio content
-    const excludedOccupations=/^(youtube star|tiktok star|twitch star|instagram star|snapchat star|podcaster|blogger|web series star|content creator)$/i;
+    const excludedOccupations=/^(youtube star|tiktok star|twitch star|instagram star|snapchat star|podcaster|blogger|web series star|content creator|esports player)$/i;
 
     const links=Array.from(doc.querySelectorAll('a[href*="/people/"]'));
     const seen=new Set();
