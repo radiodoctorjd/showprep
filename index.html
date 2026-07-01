@@ -551,6 +551,23 @@ async function fetchHTML(url){
 
 const BIRTHDAY_COUNT=10;
 
+// The profile page's meta description sometimes just restates the occupation
+// tag we're already showing on its own line (e.g. occupation="TV Actor",
+// credit="American television actor known for playing Wilson Fisk..."). Trim
+// a leading nationality/job-title clause up through "known/recognized/famous",
+// then re-capitalize so what's left still reads as a clean sentence.
+function stripRedundantOccupation(credit, occupation){
+  if(!credit) return credit;
+  if(/^(best known as|known for|known best|best recognized)/i.test(credit)) return credit;
+  const m=credit.match(/\b(known|recognized|famous)\b/i);
+  if(m && m.index>0 && m.index<60){
+    let trimmed=credit.slice(m.index);
+    trimmed=trimmed.charAt(0).toUpperCase()+trimmed.slice(1);
+    return trimmed;
+  }
+  return credit;
+}
+
 function renderBirthdayRow(p){
   return `<div class="birthday-row" id="bday-${p.slug}">
     <div class="birthday-age"><br/><span style="font-size:13px">${p.age}</span></div>
@@ -607,6 +624,9 @@ async function loadBirthdays(){
 
     if(people.length===0) throw new Error('No birthday entries found on list page');
 
+    // Oldest to youngest, as requested
+    people.sort((a,b)=>b.age-a.age);
+
     // Render immediately with name/age/occupation so the panel isn't blank
     // while we fetch each profile page for the specific "known for" credit
     document.getElementById('body-birthdays').innerHTML=
@@ -620,7 +640,8 @@ async function loadBirthdays(){
       try{
         const pdoc=await fetchHTML(p.link);
         const meta=pdoc.querySelector('meta[name="description"]')||pdoc.querySelector('meta[property="og:description"]');
-        const credit=(meta&&meta.getAttribute('content')||'').trim();
+        let credit=(meta&&meta.getAttribute('content')||'').trim();
+        credit=stripRedundantOccupation(credit,p.occupation);
         const row=document.getElementById(`bday-${p.slug}`);
         const slot=row&&row.querySelector('.bio-slot');
         if(slot) slot.textContent=credit||`${p.occupation}.`;
